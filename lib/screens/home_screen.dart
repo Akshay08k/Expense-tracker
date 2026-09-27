@@ -40,10 +40,25 @@ class HomeScreen extends StatelessWidget {
                 color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
               ),
             ),
-            const SizedBox(height: 2),
-            const Text(
-              'My Expenses',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            const SizedBox(height: 3),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: Image.asset(
+                    'assets/icon/app_icon.png',
+                    width: 22,
+                    height: 22,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'FinFlow',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.3),
+                ),
+              ],
             ),
           ],
         ),

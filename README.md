@@ -1,6 +1,7 @@
-# 💸 ExpenseTracker
+# <img src="assets/icon/app_icon.png" width="40" height="40" style="vertical-align: middle; border-radius: 10px;"/> FinFlow
 
-A modern, offline-first personal finance management application built with **Flutter**. ExpenseTracker gives you complete ownership of your financial data by turning **Spreadsheets into your Database** — generate formatted Excel (`.xlsx`) workbooks with month-wise sheets and financial KPI dashboards, or sync seamlessly to **Google Sheets** for effortless cross-device data migration without needing Firebase!
+> **Smart Expense & Spreadsheet Tracker**  
+> A modern, offline-first personal finance management application built with **Flutter**. FinFlow gives you complete ownership of your financial data by turning **Spreadsheets into your Database** — generate formatted Excel (`.xlsx`) workbooks with month-wise sheets and financial KPI dashboards, or sync seamlessly to **Google Sheets** for effortless cross-device data migration without needing Firebase!
 
 ---
 

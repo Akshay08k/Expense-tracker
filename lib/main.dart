@@ -30,7 +30,7 @@ class ExpenseTrackerApp extends StatelessWidget {
     final tracker = context.watch<TrackerProvider>();
 
     return MaterialApp(
-      title: 'Expense Tracker',
+      title: 'FinFlow',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme(),
       darkTheme: AppTheme.darkTheme(),
