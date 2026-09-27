@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/account.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
+import '../services/google_sheets_service.dart';
 import '../services/storage_service.dart';
 
 class TrackerProvider extends ChangeNotifier {
@@ -11,6 +12,8 @@ class TrackerProvider extends ChangeNotifier {
   List<Account> _accounts = [];
   String _currency = '₹';
   ThemeMode _themeMode = ThemeMode.system;
+  String? _googleSheetsUrl;
+  String? _lastSheetsSync;
 
   TrackerProvider(this._storage) {
     _loadFromStorage();
@@ -21,6 +24,9 @@ class TrackerProvider extends ChangeNotifier {
   List<Account> get accounts => List.unmodifiable(_accounts);
   String get currency => _currency;
   ThemeMode get themeMode => _themeMode;
+  String? get googleSheetsUrl => _googleSheetsUrl;
+  String? get lastSheetsSync => _lastSheetsSync;
+  bool get isGoogleSheetsConnected => _googleSheetsUrl != null && _googleSheetsUrl!.isNotEmpty;
 
   void _loadFromStorage() {
     _transactions = _storage.loadTransactions();
@@ -28,6 +34,8 @@ class TrackerProvider extends ChangeNotifier {
 
     _accounts = _storage.loadAccounts();
     _currency = _storage.loadCurrency();
+    _googleSheetsUrl = _storage.loadGoogleSheetsUrl();
+    _lastSheetsSync = _storage.loadLastSheetsSync();
 
     final themeStr = _storage.loadThemeMode();
     if (themeStr == 'light') {
@@ -263,5 +271,87 @@ class TrackerProvider extends ChangeNotifier {
 
   double getYearlyTotalIncome(int year) {
     return getYearlyIncome(year).fold(0.0, (sum, val) => sum + val);
+  }
+
+  // --- Bulk Restore Data (From Excel or Google Sheets) ---
+  Future<void> restoreData({
+    required List<TransactionModel> transactions,
+    List<Account>? accounts,
+  }) async {
+    _transactions = List.from(transactions);
+    _transactions.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+
+    if (accounts != null && accounts.isNotEmpty) {
+      _accounts = List.from(accounts);
+      await _storage.saveAccounts(_accounts);
+    }
+
+    await _storage.saveTransactions(_transactions);
+    notifyListeners();
+  }
+
+  // --- Google Sheets Sync Operations ---
+  Future<void> setGoogleSheetsUrl(String url) async {
+    _googleSheetsUrl = url.trim();
+    await _storage.saveGoogleSheetsUrl(_googleSheetsUrl!);
+    notifyListeners();
+  }
+
+  Future<void> clearGoogleSheetsUrl() async {
+    _googleSheetsUrl = null;
+    _lastSheetsSync = null;
+    await _storage.clearGoogleSheetsUrl();
+    notifyListeners();
+  }
+
+  Future<GoogleSheetsSyncResult> pushToGoogleSheets({String? overrideUrl}) async {
+    final targetUrl = overrideUrl ?? _googleSheetsUrl;
+    if (targetUrl == null || targetUrl.isEmpty) {
+      return const GoogleSheetsSyncResult(
+        success: false,
+        message: 'No Google Sheets Web App URL configured.',
+      );
+    }
+
+    final service = GoogleSheetsService(_storage.prefsInstance);
+    final result = await service.pushToGoogleSheets(
+      webAppUrl: targetUrl,
+      transactions: _transactions,
+      accounts: _accounts,
+      currency: _currency,
+    );
+
+    if (result.success) {
+      _lastSheetsSync = DateTime.now().toIso8601String();
+      await _storage.saveLastSheetsSync(_lastSheetsSync!);
+      notifyListeners();
+    }
+
+    return result;
+  }
+
+  Future<GoogleSheetsSyncResult> pullFromGoogleSheets({String? overrideUrl}) async {
+    final targetUrl = overrideUrl ?? _googleSheetsUrl;
+    if (targetUrl == null || targetUrl.isEmpty) {
+      return const GoogleSheetsSyncResult(
+        success: false,
+        message: 'No Google Sheets Web App URL configured.',
+      );
+    }
+
+    final service = GoogleSheetsService(_storage.prefsInstance);
+    final result = await service.pullFromGoogleSheets(webAppUrl: targetUrl);
+
+    if (result.success && result.transactions != null) {
+      await restoreData(
+        transactions: result.transactions!,
+        accounts: result.accounts,
+      );
+      _lastSheetsSync = DateTime.now().toIso8601String();
+      await _storage.saveLastSheetsSync(_lastSheetsSync!);
+      notifyListeners();
+    }
+
+    return result;
   }
 }

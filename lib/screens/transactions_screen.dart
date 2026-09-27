@@ -6,6 +6,7 @@ import '../state/tracker_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/quick_add_sheet.dart';
 import '../widgets/transaction_tile.dart';
+import 'spreadsheet_sync_screen.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
@@ -60,6 +61,15 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       appBar: AppBar(
         title: const Text('All Transactions', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.table_chart_rounded, color: AppColors.primary),
+            tooltip: 'Spreadsheet & Cloud DB',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SpreadsheetSyncScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.add_rounded),
             tooltip: 'Add Transaction',

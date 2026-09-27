@@ -5,6 +5,7 @@ import '../models/category.dart';
 import '../models/transaction.dart';
 import '../state/tracker_provider.dart';
 import '../theme/app_colors.dart';
+import 'quick_add_sheet.dart';
 
 class TransactionTile extends StatelessWidget {
   final TransactionModel transaction;
@@ -118,7 +119,7 @@ class TransactionTile extends StatelessWidget {
         );
       },
       child: InkWell(
-        onTap: onTap,
+        onTap: onTap ?? () => QuickAddSheet.show(context, transactionToEdit: transaction),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -242,6 +243,14 @@ class TransactionTile extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+
+              const SizedBox(width: 6),
+
+              Icon(
+                Icons.edit_outlined,
+                size: 15,
+                color: (isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary).withOpacity(0.6),
               ),
             ],
           ),

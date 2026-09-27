@@ -15,6 +15,8 @@ class StorageService {
 
   StorageService(this._prefs);
 
+  SharedPreferences get prefsInstance => _prefs;
+
   static Future<StorageService> init() async {
     final prefs = await SharedPreferences.getInstance();
     return StorageService(prefs);
@@ -83,10 +85,37 @@ class StorageService {
     return await _prefs.setString(_keyThemeMode, mode);
   }
 
+  // Google Sheets Sync Configuration
+  static const String _keyGoogleSheetsUrl = 'exp_tracker_google_sheets_url';
+  static const String _keyLastSheetsSync = 'exp_tracker_google_sheets_last_sync';
+
+  String? loadGoogleSheetsUrl() {
+    return _prefs.getString(_keyGoogleSheetsUrl);
+  }
+
+  Future<bool> saveGoogleSheetsUrl(String url) async {
+    return await _prefs.setString(_keyGoogleSheetsUrl, url.trim());
+  }
+
+  Future<bool> clearGoogleSheetsUrl() async {
+    await _prefs.remove(_keyLastSheetsSync);
+    return await _prefs.remove(_keyGoogleSheetsUrl);
+  }
+
+  String? loadLastSheetsSync() {
+    return _prefs.getString(_keyLastSheetsSync);
+  }
+
+  Future<bool> saveLastSheetsSync(String timestamp) async {
+    return await _prefs.setString(_keyLastSheetsSync, timestamp);
+  }
+
   // Reset / Clear Data
   Future<void> clearAll() async {
     await _prefs.remove(_keyTransactions);
     await _prefs.remove(_keyAccounts);
     await _prefs.remove(_keyFirstRun);
+    await _prefs.remove(_keyGoogleSheetsUrl);
+    await _prefs.remove(_keyLastSheetsSync);
   }
 }

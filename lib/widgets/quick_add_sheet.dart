@@ -10,20 +10,29 @@ import '../theme/app_colors.dart';
 
 class QuickAddSheet extends StatefulWidget {
   final TransactionType initialType;
+  final TransactionModel? transactionToEdit;
 
   const QuickAddSheet({
     super.key,
     this.initialType = TransactionType.expense,
+    this.transactionToEdit,
   });
 
-  static Future<void> show(BuildContext context, {TransactionType initialType = TransactionType.expense}) {
+  static Future<void> show(
+    BuildContext context, {
+    TransactionType initialType = TransactionType.expense,
+    TransactionModel? transactionToEdit,
+  }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: QuickAddSheet(initialType: initialType),
+        child: QuickAddSheet(
+          initialType: transactionToEdit?.type ?? initialType,
+          transactionToEdit: transactionToEdit,
+        ),
       ),
     );
   }
@@ -44,25 +53,42 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
   PaymentMode _selectedPaymentMode = PaymentMode.onlineUpi;
   DateTime _selectedDate = DateTime.now();
 
+  bool get isEditing => widget.transactionToEdit != null;
+
   @override
   void initState() {
     super.initState();
     _selectedType = widget.initialType;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final accounts = context.read<TrackerProvider>().accounts;
-      if (accounts.isNotEmpty) {
-        setState(() {
-          _selectedAccountId = accounts.first.id;
-          final savingsAcc = accounts.where((a) => a.type == AccountType.savings);
-          if (savingsAcc.isNotEmpty) {
-            _selectedToAccountId = savingsAcc.first.id;
-          } else if (accounts.length > 1) {
-            _selectedToAccountId = accounts[1].id;
-          }
-        });
-      }
-    });
+    if (widget.transactionToEdit != null) {
+      final tx = widget.transactionToEdit!;
+      _selectedType = tx.type;
+      _amountController.text = tx.amount % 1 == 0
+          ? tx.amount.toInt().toString()
+          : tx.amount.toString();
+      _titleController.text = tx.title;
+      _noteController.text = tx.note;
+      _selectedCategoryId = tx.categoryId;
+      _selectedAccountId = tx.accountId;
+      _selectedToAccountId = tx.toAccountId;
+      _selectedPaymentMode = tx.paymentMode;
+      _selectedDate = tx.dateTime;
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final accounts = context.read<TrackerProvider>().accounts;
+        if (accounts.isNotEmpty) {
+          setState(() {
+            _selectedAccountId = accounts.first.id;
+            final savingsAcc = accounts.where((a) => a.type == AccountType.savings);
+            if (savingsAcc.isNotEmpty) {
+              _selectedToAccountId = savingsAcc.first.id;
+            } else if (accounts.length > 1) {
+              _selectedToAccountId = accounts[1].id;
+            }
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -102,29 +128,54 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
       return;
     }
 
-    final newTx = TransactionModel(
-      id: const Uuid().v4(),
-      title: effectiveTitle,
-      amount: amount,
-      type: _selectedType,
-      categoryId: _selectedType == TransactionType.transfer ? 'savings' : _selectedCategoryId,
-      accountId: _selectedAccountId!,
-      toAccountId: _selectedType == TransactionType.transfer ? _selectedToAccountId : null,
-      paymentMode: _selectedPaymentMode,
-      dateTime: _selectedDate,
-      note: _noteController.text.trim(),
-    );
+    if (isEditing) {
+      final updatedTx = widget.transactionToEdit!.copyWith(
+        title: effectiveTitle,
+        amount: amount,
+        type: _selectedType,
+        categoryId: _selectedType == TransactionType.transfer ? 'savings' : _selectedCategoryId,
+        accountId: _selectedAccountId!,
+        toAccountId: _selectedType == TransactionType.transfer ? _selectedToAccountId : null,
+        paymentMode: _selectedPaymentMode,
+        dateTime: _selectedDate,
+        note: _noteController.text.trim(),
+      );
 
-    context.read<TrackerProvider>().addTransaction(newTx);
-    Navigator.of(context).pop();
+      context.read<TrackerProvider>().updateTransaction(updatedTx);
+      Navigator.of(context).pop();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Logged "$effectiveTitle" successfully'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Updated "$effectiveTitle" successfully'),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      final newTx = TransactionModel(
+        id: const Uuid().v4(),
+        title: effectiveTitle,
+        amount: amount,
+        type: _selectedType,
+        categoryId: _selectedType == TransactionType.transfer ? 'savings' : _selectedCategoryId,
+        accountId: _selectedAccountId!,
+        toAccountId: _selectedType == TransactionType.transfer ? _selectedToAccountId : null,
+        paymentMode: _selectedPaymentMode,
+        dateTime: _selectedDate,
+        note: _noteController.text.trim(),
+      );
+
+      context.read<TrackerProvider>().addTransaction(newTx);
+      Navigator.of(context).pop();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Logged "$effectiveTitle" successfully'),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
@@ -148,13 +199,69 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
           // Drag handle
           Center(
             child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              margin: const EdgeInsets.only(top: 12, bottom: 6),
               width: 38,
               height: 4.5,
               decoration: BoxDecoration(
                 color: isDark ? Colors.white24 : Colors.black12,
                 borderRadius: BorderRadius.circular(10),
               ),
+            ),
+          ),
+
+          // Header title row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isEditing ? 'Edit Transaction' : 'New Transaction',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (isEditing)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.expense, size: 22),
+                    tooltip: 'Delete Transaction',
+                    onPressed: () async {
+                      final provider = context.read<TrackerProvider>();
+                      final navigator = Navigator.of(context);
+                      final txId = widget.transactionToEdit!.id;
+                      final txTitle = widget.transactionToEdit!.title;
+
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Delete Transaction?'),
+                          content: Text('Are you sure you want to delete "$txTitle"? The account balance will be restored.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.expense),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Delete', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        provider.deleteTransaction(txId);
+                        navigator.pop();
+                      }
+                    },
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+              ],
             ),
           ),
 
@@ -546,9 +653,9 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: const Text(
-                        'Save Transaction',
-                        style: TextStyle(
+                      child: Text(
+                        isEditing ? 'Update Transaction' : 'Save Transaction',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,

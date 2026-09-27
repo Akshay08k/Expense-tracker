@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../widgets/animated_summary_card.dart';
 import '../widgets/quick_add_sheet.dart';
 import '../widgets/transaction_tile.dart';
+import 'spreadsheet_sync_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final Function(int) onNavigateTab;
@@ -47,6 +48,20 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          // Spreadsheet & Cloud Sync Hub
+          IconButton(
+            icon: const Icon(
+              Icons.table_chart_rounded,
+              size: 20,
+              color: AppColors.primary,
+            ),
+            tooltip: 'Spreadsheet & Cloud DB',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SpreadsheetSyncScreen()),
+              );
+            },
+          ),
           // Theme Switcher
           IconButton(
             icon: Icon(
