@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/account.dart';
 import '../models/category.dart';
@@ -14,6 +15,8 @@ class TrackerProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   String? _googleSheetsUrl;
   String? _lastSheetsSync;
+  Timer? _autoSyncTimer;
+  bool _isAutoSyncing = false;
 
   TrackerProvider(this._storage) {
     _loadFromStorage();
@@ -27,6 +30,7 @@ class TrackerProvider extends ChangeNotifier {
   String? get googleSheetsUrl => _googleSheetsUrl;
   String? get lastSheetsSync => _lastSheetsSync;
   bool get isGoogleSheetsConnected => _googleSheetsUrl != null && _googleSheetsUrl!.isNotEmpty;
+  bool get isAutoSyncing => _isAutoSyncing;
 
   void _loadFromStorage() {
     _transactions = _storage.loadTransactions();
@@ -94,6 +98,7 @@ class TrackerProvider extends ChangeNotifier {
     await _storage.saveTransactions(_transactions);
     await _storage.saveAccounts(_accounts);
     notifyListeners();
+    _triggerAutoSync();
   }
 
   Future<void> deleteTransaction(String id) async {
@@ -109,6 +114,7 @@ class TrackerProvider extends ChangeNotifier {
     await _storage.saveTransactions(_transactions);
     await _storage.saveAccounts(_accounts);
     notifyListeners();
+    _triggerAutoSync();
   }
 
   Future<void> updateTransaction(TransactionModel updatedTx) async {
@@ -127,6 +133,7 @@ class TrackerProvider extends ChangeNotifier {
     await _storage.saveTransactions(_transactions);
     await _storage.saveAccounts(_accounts);
     notifyListeners();
+    _triggerAutoSync();
   }
 
   void _applyBalanceChange(TransactionModel tx, {required bool isReverse}) {
@@ -157,6 +164,7 @@ class TrackerProvider extends ChangeNotifier {
     _accounts.add(account);
     await _storage.saveAccounts(_accounts);
     notifyListeners();
+    _triggerAutoSync();
   }
 
   Future<void> updateAccount(Account updatedAccount) async {
@@ -165,6 +173,7 @@ class TrackerProvider extends ChangeNotifier {
       _accounts[index] = updatedAccount;
       await _storage.saveAccounts(_accounts);
       notifyListeners();
+      _triggerAutoSync();
     }
   }
 
@@ -172,6 +181,7 @@ class TrackerProvider extends ChangeNotifier {
     _accounts.removeWhere((acc) => acc.id == accountId);
     await _storage.saveAccounts(_accounts);
     notifyListeners();
+    _triggerAutoSync();
   }
 
   // --- Settings & Preferences ---
@@ -353,5 +363,44 @@ class TrackerProvider extends ChangeNotifier {
     }
 
     return result;
+  }
+
+  // --- Instant Auto-Sync to Google Sheets ---
+  void _triggerAutoSync() {
+    if (!isGoogleSheetsConnected) return;
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = Timer(const Duration(milliseconds: 300), () {
+      _performBackgroundSync();
+    });
+  }
+
+  Future<void> _performBackgroundSync() async {
+    if (!isGoogleSheetsConnected || _isAutoSyncing) return;
+    _isAutoSyncing = true;
+    notifyListeners();
+    try {
+      final service = GoogleSheetsService(_storage.prefsInstance);
+      final result = await service.pushToGoogleSheets(
+        webAppUrl: _googleSheetsUrl!,
+        transactions: _transactions,
+        accounts: _accounts,
+        currency: _currency,
+      );
+      if (result.success) {
+        _lastSheetsSync = DateTime.now().toIso8601String();
+        await _storage.saveLastSheetsSync(_lastSheetsSync!);
+      }
+    } catch (_) {
+      // Background sync errors are silent so offline operation is uninterrupted
+    } finally {
+      _isAutoSyncing = false;
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _autoSyncTimer?.cancel();
+    super.dispose();
   }
 }

@@ -1,20 +1,29 @@
 # <img src="assets/icon/app_icon.png" width="40" height="40" style="vertical-align: middle; border-radius: 10px;"/> FinFlow
 
 > **Smart Expense & Spreadsheet Tracker**  
-> A modern, offline-first personal finance management application built with **Flutter**. FinFlow gives you complete ownership of your financial data by turning **Spreadsheets into your Database** — generate formatted Excel (`.xlsx`) workbooks with month-wise sheets and financial KPI dashboards, or sync seamlessly to **Google Sheets** for effortless cross-device data migration without needing Firebase!
+> A modern, offline-first personal finance management application built with **Flutter**. FinFlow gives you complete ownership of your financial data by turning **Spreadsheets into your Living Database** — generate beautifully formatted Excel (`.xlsx`) workbooks and sync instantly in real-time to **Google Sheets** with embedded charts, category spend groupings, and executive month-wise performance matrices without needing Firebase!
 
 ---
 
 ## 🌟 Key Highlights
 
-- 📊 **Spreadsheet as a Database**: Store, export, and manage your data in structured Excel workbooks (`.xlsx`) with automated monthly sheets and KPI dashboards.
-- 📱 **Seamless Phone Migration**: Easily switch mobile devices without data loss by importing your Excel workbook or pulling from your Google Sheet.
-- ☁️ **Serverless Google Sheets Cloud Sync**: Real-time cloud sync using a lightweight, 100% free Google Apps Script Web App — **zero Firebase setup or maintenance required**.
-- ✏️ **Full Transaction Editing & Management**: Easily tap any transaction to edit amounts, categories, accounts, payment modes, or dates with automatic balance recalculation.
+- ⚡ **Instant Real-Time Cloud Sync**: Automatically syncs transactions and accounts to Google Sheets in the background the moment you log, edit, or delete an entry — no manual sync button clicking needed!
+- 🎯 **Dedicated Named Spreadsheet Target**: Cloud sync automatically creates and targets a dedicated spreadsheet named `FinFlow_Expense_Tracker` in your Google Drive, preventing unintended edits to other files.
+- 📊 **Executive Dashboard with Embedded Charts**:
+  - 🥧 Interactive Category Spend Pie/Donut Chart.
+  - 📈 Monthly Cashflow Column Chart (Income vs Expense).
+  - 📅 **Month-Wise Financial Performance Matrix**: Month, Total Income, Total Expense, Net Profit, Net Loss, Savings Rate %, Daily Avg Spend, Highest Spend Day, Top Spend Category, and Transaction Count.
+  - 💎 High-Impact Financial KPI Hero Cards (Net Worth, Income, Expense, Net Savings, Savings Rate %).
+- 📅 **Formatted Month-Ending Sheets with Grouped Spends**:
+  - Grouped Category Spends Summary Table (Count, Total, % of Month).
+  - Monthly Financial Overview & Burn Rate KPI strip.
+  - Transaction Log with color-coded Type badges (`INCOME`, `EXPENSE`, `TRANSFER`), zebra striping, currency formatting, and frozen headers.
+- 📱 **Seamless Phone Migration**: Easily switch mobile devices without data loss by importing your Excel workbook or pulling from your Google Sheet with 1 tap.
+- ☁️ **Serverless Google Sheets Cloud Sync**: 100% free Google Apps Script Web App backend — **zero Firebase setup or recurring fees**.
+- ✏️ **Full Transaction Editing & Management**: Tap any transaction to edit amounts, categories, accounts, payment modes, or dates with automatic balance recalculation.
 - 💼 **Multi-Account & Wallet Tracking**: Separate balances for Bank Accounts, Savings & Emergency Funds, and Cash in Hand with account-to-account transfers.
 - 💳 **Online & Offline Payment Modes**: Tag spending with Cash, UPI (GPay, PhonePe, Paytm), Debit/Credit Cards, or Net Banking.
-- 📈 **Visual Analytics**: Interactive charts and spending breakdowns by category and payment method.
-- 🌓 **Adaptive Dark & Light Themes**: Beautiful, modern UI with smooth transitions and glassmorphism accents.
+- 🌓 **Adaptive Dark & Light Themes**: Modern UI with smooth transitions and glassmorphism accents.
 
 ---
 
@@ -28,7 +37,7 @@
 | **Excel Workbook Engine** | [excel](https://pub.dev/packages/excel) (v4.x) |
 | **File Picker & Sharing** | [file_picker](https://pub.dev/packages/file_picker), [share_plus](https://pub.dev/packages/share_plus) |
 | **Cloud Sync** | Google Apps Script Web App & [http](https://pub.dev/packages/http) |
-| **Charts & Visualizations** | [fl_chart](https://pub.dev/packages/fl_chart) |
+| **Charts & Visualizations** | [fl_chart](https://pub.dev/packages/fl_chart) & Google Sheets Native Charts Engine |
 | **Typography** | [google_fonts](https://pub.dev/packages/google_fonts) |
 
 ---
@@ -49,15 +58,15 @@ ExpenseTracker/
 │   │   ├── analytics_screen.dart
 │   │   ├── home_screen.dart
 │   │   ├── main_navigation.dart
-│   │   ├── spreadsheet_sync_screen.dart  # 📊 Spreadsheet & Cloud DB Hub
+│   │   ├── spreadsheet_sync_screen.dart  # 📊 Spreadsheet & Cloud DB Hub (Live Auto-Sync status)
 │   │   └── transactions_screen.dart
 │   ├── services/               # Data & storage engines
-│   │   ├── excel_service.dart            # 📑 .xlsx generator & parser
-│   │   ├── google_sheets_service.dart    # ☁️ Cloud sync service
+│   │   ├── excel_service.dart            # 📑 .xlsx generator & parser with Month-wise Matrix
+│   │   ├── google_sheets_service.dart    # ☁️ Real-time Cloud sync service
 │   │   ├── sample_data.dart
 │   │   └── storage_service.dart
 │   ├── state/
-│   │   └── tracker_provider.dart         # Global state & business logic
+│   │   └── tracker_provider.dart         # Global state & debounced instant auto-sync logic
 │   ├── theme/
 │   │   └── app_colors.dart
 │   ├── widgets/                # Modular UI widgets
@@ -67,7 +76,7 @@ ExpenseTracker/
 │   │   ├── spending_chart.dart
 │   │   └── transaction_tile.dart
 │   └── main.dart               # App entrypoint
-├── google_apps_script.js       # Ready-to-deploy Google Sheets backend script
+├── google_apps_script.js       # Production-ready Google Apps Script backend engine
 ├── pubspec.yaml                # Dependencies and metadata
 └── README.md
 ```
@@ -109,28 +118,14 @@ ExpenseTracker/
 
 ## 📊 How to Use Spreadsheet as Database
 
-### Option A: Local Excel (.xlsx) Database & File Backup
+### Option A: Google Sheets Live Cloud Sync (Instant & Real-Time)
 
-1. Open the app and tap the **Spreadsheet** icon (<kbd>📊</kbd>) in the top AppBar.
-2. Under **Excel (.xlsx) Workbook DB**, tap **"Export & Share"**:
-   - The app generates a formatted workbook containing:
-     - **`📊 Dashboard`**: Summary KPI cards, category expense breakdown table, and payment mode distribution.
-     - **Month-wise sheets** (e.g. `Sep 2026`, `Aug 2026`): Clean, chronological tables of that month's transactions with subtotals.
-     - **`All_Transactions` & `Accounts`**: Master raw data for 100% lossless restoration.
-   - The native share dialog opens — save directly to **Google Drive**, **WhatsApp**, or your local device storage.
-3. **Restoring on a new phone**:
-   - On your new mobile phone, tap **"Import & Restore"**, pick your exported `.xlsx` file, and tap **"Restore Data"**. All transactions and accounts are instantly restored!
-
----
-
-### Option B: Google Sheets Live Cloud Sync (No Firebase!)
-
-You can connect your app to a personal Google Sheet stored in your Google Drive:
+You can connect your app to a dedicated Google Sheet stored in your Google Drive:
 
 #### 2-Minute Google Sheets Setup:
-1. Open [sheets.new](https://sheets.new) in your browser to create a new Google Sheet.
+1. Open [sheets.new](https://sheets.new) in your browser.
 2. In the top menu, go to **Extensions > Apps Script**.
-3. Delete any default code in `Code.gs`, and paste the entire content of [`google_apps_script.js`](file:///d:/Projects/ExpenseTracker/google_apps_script.js).
+3. Delete any default code in `Code.gs`, and paste the entire content of [`google_apps_script.js`](google_apps_script.js) (or tap **"Copy Script"** in the app's Sync screen).
 4. Click the blue **Deploy** button (top right) > **New deployment**.
 5. Click the gear icon next to "Select type" and select **Web app**.
 6. Set:
@@ -139,9 +134,24 @@ You can connect your app to a personal Google Sheet stored in your Google Drive:
 7. Click **Deploy**, authorize permissions when prompted, and copy the **Web app URL** (`https://script.google.com/macros/s/.../exec`).
 8. In the ExpenseTracker app, open the **Spreadsheet & Cloud DB** screen, paste the URL, and tap the checkmark (<kbd>✔</kbd>) to save.
 
-#### How to Sync:
-- **Push to Cloud**: Syncs all your transactions and accounts to your Google Sheet in real time.
-- **Pull (New Phone)**: When you switch to a new mobile device, simply install the app, paste your Web App URL, and tap **"Pull (New Phone)"** to restore all your data!
+#### How Sync Operates:
+- **⚡ Instant Auto-Sync**: Any time you log, update, or delete a transaction, or manage an account, the app automatically syncs in the background with zero lag.
+- **Push to Cloud**: Manual 1-tap backup anytime you want to force an immediate refresh.
+- **Pull (New Phone)**: When switching devices, install the app, paste your Web App URL, and tap **"Pull (New Phone)"** to restore your entire database in seconds!
+
+---
+
+### Option B: Local Excel (.xlsx) Database & File Backup
+
+1. Open the app and tap the **Spreadsheet** icon (<kbd>📊</kbd>) in the top AppBar.
+2. Under **Excel (.xlsx) Workbook DB**, tap **"Export & Share"**:
+   - The app generates a formatted workbook containing:
+     - **`📊 Dashboard`**: Summary KPI cards, Category Spend Breakdown, and Month-Wise Financial Performance Matrix.
+     - **Month-wise sheets** (e.g. `Jan 2026`, `Feb 2026`): Grouped category spend summary and chronological transaction log.
+     - **`All_Transactions` & `Accounts`**: Master raw data for 100% lossless restoration.
+   - The native share dialog opens — save directly to **Google Drive**, **WhatsApp**, or local device storage.
+3. **Restoring on a new phone**:
+   - Tap **"Import & Restore"**, select your `.xlsx` file, and tap **"Restore Data"**.
 
 ---
 
@@ -156,9 +166,40 @@ You can connect your app to a personal Google Sheet stored in your Google Drive:
 
 ## 📝 Changelog
 
+### [v1.2.0] - 2026-10-02
+#### Added
+- **⚡ Instant Real-Time Auto-Sync Engine**:
+  - Transactions and accounts now automatically sync to Google Sheets in the background whenever an item is created, edited, or deleted.
+  - Implemented debounced, non-blocking synchronization so UI interaction remains ultra-responsive and works fully offline.
+  - Added live `⚡ Instant Auto-Sync active` indicator banner in the Spreadsheet Sync screen.
+- **🎯 Dedicated Target Spreadsheet File (`FinFlow_Expense_Tracker`)**:
+  - Google Apps Script now automatically discovers or creates a dedicated spreadsheet named `FinFlow_Expense_Tracker` in Google Drive.
+  - Eliminates accidental logging into random active sheets or container spreadsheets.
+- **📊 Executive Dashboard with Embedded Visual Analytics**:
+  - **Embedded Pie / Donut Chart**: Native Google Sheets chart visualizing expense distribution by category.
+  - **Embedded Cashflow Bar Chart**: Month-by-month Income vs Expense comparison.
+  - **Month-Wise Financial Performance Matrix**:
+    - Month Name
+    - Total Income
+    - Total Expense
+    - Total Profit (Net positive gain)
+    - Total Loss (Net overspending deficit)
+    - Savings Rate %
+    - Daily Average Spend
+    - Highest Spend Day (date & amount)
+    - Top Spend Category (category & amount)
+    - Transaction Count
+- **📅 Formatted Month-Ending Sheets with Grouped Spends**:
+  - Month Overview Banner & KPI strip (Income, Expense, Net, Daily Avg, Entries count).
+  - **Grouped Spends by Category Summary Table**: Category name, count of transactions, total amount spent, and % share of monthly expenses.
+  - Filterable Transaction Log with color-coded type badges (`INCOME`, `EXPENSE`, `TRANSFER`), currency formatting, zebra striping, and frozen headers.
+- **Clean & Focused Spreadsheets**: Removed all keyboard shortcut cheatsheets and jump links for a clean, distraction-free executive financial workbook.
+
+---
+
 ### [v1.1.0] - 2026-09-27
 #### Added
-- **Transaction Editing**: Complete support for editing existing transactions (amount, category, source/destination accounts, payment modes, notes, date/time) with automatic balance recalculation.
+- **Transaction Editing**: Complete support for editing existing transactions with automatic balance recalculation.
 - **Excel (.xlsx) Database Generator**:
   - `📊 Dashboard` tab with financial KPIs and category/payment breakdown.
   - Automatic **Month-Wise Sheets** (e.g. `Sep 2026`, `Aug 2026`).
@@ -170,11 +211,6 @@ You can connect your app to a personal Google Sheet stored in your Google Drive:
   - Cross-device data recovery ("Pull on New Phone") without Firebase.
   - Included `google_apps_script.js` template in workspace with in-app setup guide.
 - **Spreadsheet & Cloud DB Screen**: Dedicated hub for managing Excel backups and cloud sync status.
-
-#### Improved
-- Added direct edit button and tap interaction to `TransactionTile`.
-- Added visual spreadsheet access shortcut in `HomeScreen` and `TransactionsScreen` AppBars.
-- Cleaned up analyzer warnings and verified test coverage.
 
 ---
 
@@ -188,15 +224,17 @@ You can connect your app to a personal Google Sheet stored in your Google Drive:
 
 ---
 
-## 🏷️ Release Notes (v1.1.0)
+## 🏷️ Release Notes (v1.2.0)
 
-> **Release**: ExpenseTracker v1.1.0  
+> **Release**: FinFlow v1.2.0  
 > **Status**: Production Ready  
-> **Highlight**: *Spreadsheet as Database & Full Transaction Editing*
+> **Highlight**: *Instant Cloud Auto-Sync & Executive Spreadsheet Intelligence*
 
-This release addresses the two most requested features for ExpenseTracker:
-1. **Full Transaction Editing**: You can now edit any logged transaction by simply tapping it. Changing the amount, account, or type automatically corrects account balances.
-2. **Device Independence via Spreadsheets**: You no longer need to worry about losing data when switching phones! Use formatted `.xlsx` Excel exports with monthly sheets and dashboards, or connect directly to Google Sheets for instantaneous cloud sync without Firebase fees or setup complexities.
+This release transforms FinFlow into an autonomous, real-time financial tracking operating system:
+1. **Instant Real-Time Auto-Sync**: No more manual pressing of the sync button! Any transaction added, edited, or removed immediately updates your Google Sheet in the background.
+2. **Executive Financial Dashboard**: Your Google Sheet now automatically builds embedded interactive Pie and Column charts, plus a complete Month-Wise Financial Performance Matrix tracking Profit, Loss, Savings Rate, Top Spend Categories, and Highest Spend Days.
+3. **Monthly Sheets with Grouped Spends**: Each month-ending sheet now includes a clean category spending summary table alongside the formatted, color-badged transaction logs.
+4. **Dedicated Cloud Database Target**: All your data is cleanly isolated in `FinFlow_Expense_Tracker` in your Google Drive.
 
 ---
 

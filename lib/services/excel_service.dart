@@ -243,6 +243,101 @@ class ExcelService {
       }
     }
 
+    // Month-Wise Financial Performance Table
+    final monthHeaderRow = currentPayRow + 2;
+    dash.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: monthHeaderRow))
+      ..value = TextCellValue('MONTH-WISE FINANCIAL PERFORMANCE & SUMMARY')
+      ..cellStyle = sectionHeaderStyle;
+    final mDashHeaders = [
+      'MONTH',
+      'INCOME ($currency)',
+      'EXPENSE ($currency)',
+      'PROFIT ($currency)',
+      'LOSS ($currency)',
+      'HIGHEST TRANSACTION DAY',
+      'TOP SPEND CATEGORY',
+      'TX COUNT'
+    ];
+    final mDashHeadRow = monthHeaderRow + 1;
+    for (int mi = 0; mi < mDashHeaders.length; mi++) {
+      dash.cell(CellIndex.indexByColumnRow(columnIndex: mi, rowIndex: mDashHeadRow))
+        ..value = TextCellValue(mDashHeaders[mi])
+        ..cellStyle = tableHeaderStyle;
+    }
+
+    final Map<String, List<TransactionModel>> allMonthGroups = {};
+    for (final tx in transactions) {
+      final k = DateFormat('yyyy-MM').format(tx.dateTime);
+      allMonthGroups.putIfAbsent(k, () => []).add(tx);
+    }
+    final sortedMonthKeys = allMonthGroups.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    int currentMonthRow = mDashHeadRow + 1;
+    for (final mKey in sortedMonthKeys) {
+      final mList = allMonthGroups[mKey]!;
+      final monthDisplay = DateFormat('MMM yyyy').format(DateTime.parse('$mKey-01'));
+      double mInc = 0.0;
+      double mExp = 0.0;
+      final Map<String, double> dayExpenses = {};
+      final Map<String, double> catExpenses = {};
+
+      for (final tx in mList) {
+        final dayStr = DateFormat('yyyy-MM-dd').format(tx.dateTime);
+        if (tx.type == TransactionType.income) {
+          mInc += tx.amount;
+        } else if (tx.type == TransactionType.expense) {
+          mExp += tx.amount;
+          dayExpenses[dayStr] = (dayExpenses[dayStr] ?? 0.0) + tx.amount;
+          catExpenses[tx.categoryId] = (catExpenses[tx.categoryId] ?? 0.0) + tx.amount;
+        }
+      }
+
+      final profit = mInc > mExp ? mInc - mExp : 0.0;
+      final loss = mExp > mInc ? mExp - mInc : 0.0;
+
+      String highestDay = 'N/A';
+      double maxDaySpend = 0.0;
+      for (final e in dayExpenses.entries) {
+        if (e.value > maxDaySpend) {
+          maxDaySpend = e.value;
+          highestDay = '${e.key} ($currency${maxDaySpend.toStringAsFixed(2)})';
+        }
+      }
+
+      String topCat = 'N/A';
+      double maxCatSpend = 0.0;
+      for (final e in catExpenses.entries) {
+        if (e.value > maxCatSpend) {
+          maxCatSpend = e.value;
+          final c = ExpenseCategory.findById(e.key);
+          topCat = '${c.name} ($currency${maxCatSpend.toStringAsFixed(2)})';
+        }
+      }
+
+      dash.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: currentMonthRow)).value =
+          TextCellValue(monthDisplay);
+      dash.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: currentMonthRow))
+        ..value = DoubleCellValue(mInc)
+        ..cellStyle = incomeValueStyle;
+      dash.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: currentMonthRow))
+        ..value = DoubleCellValue(mExp)
+        ..cellStyle = expenseValueStyle;
+      dash.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: currentMonthRow))
+        ..value = DoubleCellValue(profit)
+        ..cellStyle = profit > 0 ? incomeValueStyle : kpiValueStyle;
+      dash.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: currentMonthRow))
+        ..value = DoubleCellValue(loss)
+        ..cellStyle = loss > 0 ? expenseValueStyle : kpiValueStyle;
+      dash.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: currentMonthRow)).value =
+          TextCellValue(highestDay);
+      dash.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: currentMonthRow)).value =
+          TextCellValue(topCat);
+      dash.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: currentMonthRow)).value =
+          IntCellValue(mList.length);
+
+      currentMonthRow++;
+    }
+
     // ---------------------------------------------------------
     // 2. MONTH-WISE SHEETS
     // ---------------------------------------------------------
@@ -336,6 +431,51 @@ class ExcelService {
                 : accName);
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: rowNum)).value =
             TextCellValue(tx.note);
+      }
+
+      // Grouped Spends by Category for this month
+      final Map<String, double> mCatSums = {};
+      final Map<String, int> mCatCounts = {};
+      for (final tx in mTransactions) {
+        if (tx.type == TransactionType.expense) {
+          mCatSums[tx.categoryId] = (mCatSums[tx.categoryId] ?? 0.0) + tx.amount;
+          mCatCounts[tx.categoryId] = (mCatCounts[tx.categoryId] ?? 0) + 1;
+        }
+      }
+
+      final catSummaryStartRow = 3 + mTransactions.length + 2;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: catSummaryStartRow))
+        ..value = TextCellValue('SPENDS GROUPED BY CATEGORY')
+        ..cellStyle = sectionHeaderStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: catSummaryStartRow))
+        ..value = TextCellValue('COUNT')
+        ..cellStyle = sectionHeaderStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: catSummaryStartRow))
+        ..value = TextCellValue('TOTAL SPENT ($currency)')
+        ..cellStyle = sectionHeaderStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: catSummaryStartRow))
+        ..value = TextCellValue('% OF MONTH SPENDS')
+        ..cellStyle = sectionHeaderStyle;
+
+      final mSortedCats = mCatSums.keys.toList()
+        ..sort((a, b) => (mCatSums[b] ?? 0).compareTo(mCatSums[a] ?? 0));
+
+      int mCatRow = catSummaryStartRow + 1;
+      for (final catId in mSortedCats) {
+        final cat = ExpenseCategory.findById(catId);
+        final sum = mCatSums[catId] ?? 0.0;
+        final count = mCatCounts[catId] ?? 0;
+        final pct = mExpense > 0 ? (sum / mExpense) * 100 : 0.0;
+
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: mCatRow)).value =
+            TextCellValue(cat.name);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: mCatRow)).value =
+            IntCellValue(count);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: mCatRow)).value =
+            DoubleCellValue(sum);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: mCatRow)).value =
+            TextCellValue('${pct.toStringAsFixed(1)}%');
+        mCatRow++;
       }
     }
 

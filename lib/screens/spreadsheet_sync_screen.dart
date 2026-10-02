@@ -684,6 +684,46 @@ class _SpreadsheetSyncScreenState extends State<SpreadsheetSyncScreen> {
                     ],
                   ),
 
+                  if (isConnected) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            provider.isAutoSyncing ? Icons.sync_rounded : Icons.bolt_rounded,
+                            size: 16,
+                            color: const Color(0xFF0284C7),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              provider.isAutoSyncing
+                                  ? 'Syncing changes instantly to Google Sheets...'
+                                  : '⚡ Instant Auto-Sync active: changes are synced to your sheet in real-time.',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF0284C7),
+                              ),
+                            ),
+                          ),
+                          if (provider.isAutoSyncing)
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0284C7)),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 14),
 
                   // URL Input Field
