@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../widgets/animated_summary_card.dart';
 import '../widgets/quick_add_sheet.dart';
 import '../widgets/transaction_tile.dart';
+import 'payment_detection_screen.dart';
 import 'spreadsheet_sync_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -63,6 +64,20 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          // Payment Auto-Detection
+          IconButton(
+            icon: const Icon(
+              Icons.bolt_rounded,
+              size: 22,
+              color: Color(0xFFF59E0B),
+            ),
+            tooltip: 'Payment Auto-Detection',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PaymentDetectionScreen()),
+              );
+            },
+          ),
           // Spreadsheet & Cloud Sync Hub
           IconButton(
             icon: const Icon(

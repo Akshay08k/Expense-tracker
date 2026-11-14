@@ -11,17 +11,35 @@ import '../theme/app_colors.dart';
 class QuickAddSheet extends StatefulWidget {
   final TransactionType initialType;
   final TransactionModel? transactionToEdit;
+  final double? prefilledAmount;
+  final String? prefilledTitle;
+  final DateTime? prefilledDate;
+  final PaymentMode? prefilledPaymentMode;
+  final String? prefilledCategoryId;
+  final String? detectedSourceApp;
 
   const QuickAddSheet({
     super.key,
     this.initialType = TransactionType.expense,
     this.transactionToEdit,
+    this.prefilledAmount,
+    this.prefilledTitle,
+    this.prefilledDate,
+    this.prefilledPaymentMode,
+    this.prefilledCategoryId,
+    this.detectedSourceApp,
   });
 
   static Future<void> show(
     BuildContext context, {
     TransactionType initialType = TransactionType.expense,
     TransactionModel? transactionToEdit,
+    double? prefilledAmount,
+    String? prefilledTitle,
+    DateTime? prefilledDate,
+    PaymentMode? prefilledPaymentMode,
+    String? prefilledCategoryId,
+    String? detectedSourceApp,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -32,6 +50,12 @@ class QuickAddSheet extends StatefulWidget {
         child: QuickAddSheet(
           initialType: transactionToEdit?.type ?? initialType,
           transactionToEdit: transactionToEdit,
+          prefilledAmount: prefilledAmount,
+          prefilledTitle: prefilledTitle,
+          prefilledDate: prefilledDate,
+          prefilledPaymentMode: prefilledPaymentMode,
+          prefilledCategoryId: prefilledCategoryId,
+          detectedSourceApp: detectedSourceApp,
         ),
       ),
     );
@@ -74,6 +98,24 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
       _selectedPaymentMode = tx.paymentMode;
       _selectedDate = tx.dateTime;
     } else {
+      if (widget.prefilledAmount != null) {
+        final amt = widget.prefilledAmount!;
+        _amountController.text =
+            amt % 1 == 0 ? amt.toInt().toString() : amt.toStringAsFixed(2);
+      }
+      if (widget.prefilledTitle != null && widget.prefilledTitle!.isNotEmpty) {
+        _titleController.text = widget.prefilledTitle!;
+      }
+      if (widget.prefilledDate != null) {
+        _selectedDate = widget.prefilledDate!;
+      }
+      if (widget.prefilledPaymentMode != null) {
+        _selectedPaymentMode = widget.prefilledPaymentMode!;
+      }
+      if (widget.prefilledCategoryId != null) {
+        _selectedCategoryId = widget.prefilledCategoryId!;
+      }
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final accounts = context.read<TrackerProvider>().accounts;
         if (accounts.isNotEmpty) {
@@ -272,6 +314,49 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (widget.detectedSourceApp != null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.bolt_rounded, color: AppColors.primary, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Auto-detected from ${widget.detectedSourceApp}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'PREFILLED',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   // Type Selector: Expense, Income, Transfer
                   Container(
                     padding: const EdgeInsets.all(4),

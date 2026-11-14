@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/payment_detector_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/quick_add_sheet.dart';
 import 'accounts_screen.dart';
@@ -13,8 +15,68 @@ class MainNavigation extends StatefulWidget {
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _MainNavigationState extends State<MainNavigation>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
+  StreamSubscription<DetectedPayment>? _paymentSubscription;
+  bool _isPromptOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // Listen to real-time detected payments (while app is in foreground)
+    _paymentSubscription =
+        PaymentDetectorService.paymentStream.listen(_handleDetectedPayment);
+
+    // Check if app was opened/launched via a payment notification
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingPayment();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _paymentSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPendingPayment();
+    }
+  }
+
+  Future<void> _checkPendingPayment() async {
+    final pending = await PaymentDetectorService.getPendingPayment();
+    if (pending != null && mounted) {
+      _handleDetectedPayment(pending);
+    }
+  }
+
+  void _handleDetectedPayment(DetectedPayment payment) {
+    if (_isPromptOpen || !mounted) return;
+    _isPromptOpen = true;
+
+    final predictedCategory =
+        PaymentDetectorService.predictCategoryId(payment.title);
+
+    QuickAddSheet.show(
+      context,
+      prefilledAmount: payment.amount,
+      prefilledTitle: payment.title,
+      prefilledDate: payment.timestamp,
+      prefilledCategoryId: predictedCategory,
+      detectedSourceApp: payment.sourceApp,
+    ).then((_) {
+      if (mounted) {
+        setState(() => _isPromptOpen = false);
+      }
+    });
+  }
 
   void _onTabTapped(int index) {
     setState(() {

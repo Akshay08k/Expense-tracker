@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/main_navigation.dart';
+import 'services/payment_detector_service.dart';
 import 'services/storage_service.dart';
 import 'state/tracker_provider.dart';
 import 'theme/app_theme.dart';
@@ -11,6 +12,9 @@ void main() async {
   // Initialize local persistent storage
   final storage = await StorageService.init();
   await storage.ensureInitialized();
+
+  // Initialize native Android payment detector listener
+  PaymentDetectorService.initialize();
 
   runApp(
     MultiProvider(

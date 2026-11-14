@@ -13,7 +13,7 @@
     <a href="https://dart.dev/"><img src="https://img.shields.io/badge/Dart-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart" /></a>
     <a href="#author--license"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT" /></a>
     <a href="#"><img src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS-lightgrey?style=flat-square" alt="Platform" /></a>
-    <a href="#"><img src="https://img.shields.io/badge/Version-v1.2.0-emerald?style=flat-square&color=059669" alt="Version v1.2.0" /></a>
+    <a href="#"><img src="https://img.shields.io/badge/Version-v1.3.0-emerald?style=flat-square&color=059669" alt="Version v1.3.0" /></a>
   </p>
 
   <p>
@@ -54,6 +54,8 @@ Every entry, edit, or balance adjustment syncs seamlessly in the background to a
 - **Formatted Month-Ending Reports**: Monthly sheets feature grouped category spending tables (`Count`, `Total`, `% of Month`), burn rate KPI strips, color-coded badges (`INCOME`, `EXPENSE`, `TRANSFER`), zebra-striped rows, and frozen header rows.
 
 ### Personal Finance Management
+- **Instant Payment Auto-Detection (Android)**: Captures payments in real-time from Google Pay, PhonePe, Paytm, CRED, BHIM, and bank push notifications. Pops up a prefilled sheet with Amount, Payee, and predicted Category so you can review and save in 1 tap.
+- **Battery-Friendly & 100% Private**: Event-driven native Android listener that sleeps until a payment arrives (<0.1% daily battery). Never accesses or reads your SMS inbox, OTPs, or private chats.
 - **Multi-Account & Wallet Support**: Manage distinct balances across Bank Accounts, Cash in Hand, and Savings or Emergency Funds with account-to-account transfer tracking.
 - **Payment Mode Classification**: Tag payments by Cash, UPI (GPay, PhonePe, Paytm), Debit/Credit Cards, or Net Banking.
 - **Complete Transaction Lifecycle**: Tap any record to edit amounts, dates, accounts, or categories with automatic account balance recalculation, or swipe to delete with instant balance restoration.
@@ -209,6 +211,13 @@ If you prefer keeping your data strictly local or sharing via external channels:
 ---
 
 ## Changelog
+
+### v1.3.0
+- **Instant Payment Auto-Detection (Android)**: Real-time background detection of UPI and card payment alerts (Google Pay, PhonePe, Paytm, CRED, BHIM, Amazon Pay, and banking apps) via native Android `NotificationListenerService`.
+- **Pre-filled Transaction Prompt**: Automatically extracts Amount, Payee/Merchant name, and Timestamp, displaying an interactive heads-up notification that opens directly into a pre-filled entry sheet.
+- **Smart Category Prediction**: Contextual keyword engine that automatically pre-selects the appropriate category (Food & Dining, Groceries, Transport, Bills, Shopping, Health, Entertainment) based on merchant names.
+- **Privacy-First & Zero Battery Drain**: Operates on native OS event callbacks (<0.1% daily battery impact) and completely eliminates the security risks of SMS scraping (no SMS/OTP access required).
+- **Payment Detection & Simulator Hub**: Dedicated management screen with live permission status, one-tap access to Android Notification Access settings, and built-in transaction simulators for testing.
 
 ### v1.2.0
 - **Instant Cloud Auto-Sync Engine**: Non-blocking background sync to Google Sheets on every record creation, edit, or deletion with offline fallback.

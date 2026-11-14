@@ -7,6 +7,7 @@ import '../models/transaction.dart';
 import '../state/tracker_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/account_card.dart';
+import 'payment_detection_screen.dart';
 
 class AccountsScreen extends StatelessWidget {
   const AccountsScreen({super.key});
@@ -247,6 +248,15 @@ class AccountsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Accounts & Savings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bolt_rounded, color: Color(0xFFF59E0B)),
+            tooltip: 'Payment Auto-Detection',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PaymentDetectionScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.add_card_rounded),
             tooltip: 'Add Account',
