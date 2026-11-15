@@ -20,19 +20,45 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         private const val CHANNEL_NAME = "Detected Payments"
         private const val NOTIFICATION_ID = 9001
 
-        // Whitelisted payment & banking app package names in India/Global
+        // Whitelisted payment, banking, and transactional notification apps
         val SUPPORTED_PACKAGES = mapOf(
+            // Primary UPI Apps
             "com.google.android.apps.nbu.paisa.user" to "Google Pay",
             "com.phonepe.app" to "PhonePe",
             "net.one97.paytm" to "Paytm",
-            "in.org.npci.upiapp" to "BHIM",
+            "in.org.npci.upiapp" to "BHIM UPI",
             "com.cred.club" to "CRED",
             "in.amazon.mShop.android.shopping" to "Amazon Pay",
-            "com.sbi.upi" to "SBI UPI",
+
+            // Bank of Baroda (BOB)
+            "com.bankofbaroda.upi" to "BHIM Baroda Pay",
+            "com.ibspl.bobworld" to "bob World",
+            "com.baroda.mconnect" to "BOB mConnect",
+
+            // Major Banks
+            "com.sbi.upi" to "BHIM SBI Pay",
+            "com.sbi.lotusintouch" to "SBI YONO",
             "com.csam.icici.bank.imobile" to "iMobile ICICI",
             "com.hdfcbank.payzapp" to "PayZapp HDFC",
+            "com.snapwork.hdfc" to "HDFC MobileBanking",
             "com.axis.mobile" to "Axis Mobile",
-            "com.msf.kopl" to "Kotak Bank"
+            "com.upi.axispay" to "BHIM Axis Pay",
+            "com.msf.kopl" to "Kotak Bank",
+            "com.canarabank.mobility" to "Canara Bank",
+            "com.pnb.upi" to "BHIM PNB",
+            "com.unionbank.ecommerce.mobile.android" to "Union Bank",
+            "com.idfcfirstbank.optimus" to "IDFC First",
+            "money.jupiter" to "Jupiter",
+            "co.fi.money" to "Fi Money",
+
+            // Truecaller (Smart Payment / UPI notification)
+            "com.truecaller" to "Truecaller Pay",
+
+            // Default Messaging Apps (For Bank Debit SMS like BOBSMS - No READ_SMS permission needed!)
+            "com.google.android.apps.messaging" to "Bank SMS",
+            "com.samsung.android.messaging" to "Bank SMS",
+            "com.android.mms" to "Bank SMS",
+            "com.oneplus.mms" to "Bank SMS"
         )
     }
 
@@ -48,7 +74,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
         val packageName = sbn.packageName ?: return
 
-        // 1. FAST FILTER: Ignore 99.9% of unrelated notifications instantly (Zero Battery Drain)
+        // 1. FAST FILTER: Only inspect whitelisted packages (Zero Battery Drain)
         if (!SUPPORTED_PACKAGES.containsKey(packageName)) {
             return
         }
@@ -59,12 +85,14 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         val title = extras.getCharSequence("android.title")?.toString() ?: ""
         val text = extras.getCharSequence("android.text")?.toString() ?: ""
         val bigText = extras.getCharSequence("android.bigText")?.toString() ?: ""
+        val subText = extras.getCharSequence("android.subText")?.toString() ?: ""
+        val infoText = extras.getCharSequence("android.infoText")?.toString() ?: ""
 
-        val fullText = "$title $text $bigText".trim()
-        Log.d(TAG, "Processing notification from $appName: $fullText")
+        val fullText = "$title $text $bigText $subText $infoText".trim()
+        Log.d(TAG, "Processing notification from $appName ($packageName): $fullText")
 
-        // 2. Parse Amount and Payee/Merchant using Regex
-        val parsed = parseTransaction(fullText, title, text, appName) ?: return
+        // 2. Parse Amount and Payee/Merchant using enhanced Regex
+        val parsed = parseTransaction(fullText, title, text, appName, packageName) ?: return
 
         Log.d(TAG, "Successfully parsed transaction: Amount=${parsed.amount}, Payee=${parsed.payee}, App=${parsed.sourceApp}")
 
@@ -93,26 +121,49 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         val timestamp: Long
     )
 
-    private fun parseTransaction(fullText: String, title: String, text: String, appName: String): ParsedPayment? {
+    private fun parseTransaction(
+        fullText: String,
+        title: String,
+        text: String,
+        appName: String,
+        packageName: String
+    ): ParsedPayment? {
         val lower = fullText.lowercase()
 
-        // Ignore OTP, login, promotional, or non-debit alerts
+        // Ignore OTP, login, password, or non-transaction alerts
         if (lower.contains("otp") || lower.contains("login") || lower.contains("code") ||
-            lower.contains("cashback received") || lower.contains("offers")) {
+            lower.contains("secret") || lower.contains("password") ||
+            lower.contains("cashback received") || lower.contains("offers")
+        ) {
             return null
         }
 
-        // Must indicate a payment, debit, or sent transaction
-        val isPayment = lower.contains("paid") || lower.contains("sent") ||
+        // For SMS messaging apps: Ensure it's from a bank/financial sender or has transaction keywords
+        val isMessagingApp = packageName.contains("messaging") || packageName.contains("mms")
+        if (isMessagingApp) {
+            val isBankSender = title.matches(Regex("(?i).*(bob|sbi|hdfc|icici|axis|kotak|pnb|canara|union|idfc|paytm|upi|sms|alert|bank|citi|rbl|indus|yesb|bop|baroda).*"))
+            val hasDebitIndicator = lower.contains("dr.") || lower.contains("dr ") ||
+                    lower.contains("debited") || lower.contains("withdrawn") ||
+                    lower.contains("spent") || lower.contains("paid") || lower.contains("cr. to")
+            if (!isBankSender && !hasDebitIndicator) {
+                return null // Instantly drop non-banking personal SMS from friends
+            }
+        }
+
+        // Must indicate a payment, debit, transfer, OR have currency symbol with a payee
+        val hasDebitKeyword = lower.contains("paid") || lower.contains("sent") ||
                 lower.contains("debited") || lower.contains("successful") ||
                 lower.contains("transfer to") || lower.contains("payment to") ||
-                lower.contains("spent")
+                lower.contains("spent") || lower.contains("dr.") || lower.contains("dr ") ||
+                lower.contains("cr. to") || lower.contains("cr to")
 
-        if (!isPayment) {
+        val hasCurrencySymbol = fullText.contains("₹") || lower.contains("rs.") || lower.contains("rs ") || lower.contains("inr")
+
+        if (!hasDebitKeyword && !hasCurrencySymbol) {
             return null
         }
 
-        // Regex for Amount: Matches ₹ 120, INR 1,250.50, Rs. 450, etc.
+        // Regex for Amount: Handles Rs.10.00, Rs 10, ₹10, INR 1,250.50, Paid 10, etc.
         val amountPattern = Pattern.compile(
             "(?:(?:₹|rs\\.?|inr|paid|debited by|debited for)\\s*[:.]?\\s*([0-9,]+(?:\\.[0-9]{1,2})?))",
             Pattern.CASE_INSENSITIVE
@@ -125,9 +176,12 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             amount = rawAmt?.toDoubleOrNull()
         }
 
-        // Fallback for amounts directly preceding currency: "150.00 paid" or "500 debited"
+        // Fallback: [number] ₹ / Rs
         if (amount == null) {
-            val fallbackPattern = Pattern.compile("([0-9,]+(?:\\.[0-9]{1,2})?)\\s*(?:₹|rs\\.?|inr)", Pattern.CASE_INSENSITIVE)
+            val fallbackPattern = Pattern.compile(
+                "([0-9,]+(?:\\.[0-9]{1,2})?)\\s*(?:₹|rs\\.?|inr)",
+                Pattern.CASE_INSENSITIVE
+            )
             val fallbackMatcher = fallbackPattern.matcher(fullText)
             if (fallbackMatcher.find()) {
                 val rawAmt = fallbackMatcher.group(1)?.replace(",", "")
@@ -139,36 +193,71 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             return null
         }
 
-        // Regex for Payee/Merchant Name
-        var payee = "Payment via $appName"
-        val payeePattern = Pattern.compile(
-            "(?:(?:to|at|for|paid to|sent to)\\s+([A-Za-z0-9 &._'-]{2,30}?)(?:\\s+successful|\\s+using|\\s+on|\\s+at|\\s+from|\\.|,|$))",
+        // Extract Payee / Merchant / VPA
+        var payee = ""
+
+        // Pattern 1: Cr. to <payee> (very common in Indian Bank SMS like BOBSMS)
+        val crToPattern = Pattern.compile(
+            "(?:(?:cr\\.?\\s+to|credited\\s+to)\\s+([A-Za-z0-9@&._'-]{2,35}?)(?:\\s+on|\\s+ref|\\s+using|\\.|,|$))",
             Pattern.CASE_INSENSITIVE
         )
-        val payeeMatcher = payeePattern.matcher(fullText)
+        val crToMatcher = crToPattern.matcher(fullText)
+        if (crToMatcher.find()) {
+            payee = crToMatcher.group(1)?.trim() ?: ""
+        }
 
-        if (payeeMatcher.find()) {
-            val extracted = payeeMatcher.group(1)?.trim()
-            if (!extracted.isNullOrBlank() && extracted.length > 1 && !extracted.equals("you", ignoreCase = true)) {
-                payee = cleanPayeeName(extracted)
+        // Pattern 2: to / at / for / paid to / sent to <payee>
+        if (payee.isBlank()) {
+            val toPattern = Pattern.compile(
+                "(?:(?:paid to|sent to|transfer to|payment to|to|at)\\s+([A-Za-z0-9@&._'-]{2,35}?)(?:\\s+successful|\\s+using|\\s+on|\\s+at|\\s+from|\\s+ref|\\.|,|$))",
+                Pattern.CASE_INSENSITIVE
+            )
+            val toMatcher = toPattern.matcher(fullText)
+            if (toMatcher.find()) {
+                val extracted = toMatcher.group(1)?.trim()
+                if (!extracted.isNullOrBlank() && !extracted.equals("you", ignoreCase = true) && !extracted.equals("a/c", ignoreCase = true)) {
+                    payee = extracted
+                }
             }
-        } else if (title.isNotBlank() && !title.equals(appName, ignoreCase = true) && !title.contains("paid", ignoreCase = true)) {
-            payee = cleanPayeeName(title)
+        }
+
+        // Pattern 3: Truecaller / UPI format where title is the VPA / Payee (e.g. "Komaleakshay7@oksbi")
+        if (payee.isBlank() && title.isNotBlank() && !title.equals(appName, ignoreCase = true) && !title.contains("SMS", ignoreCase = true)) {
+            payee = title.trim()
+        }
+
+        val effectivePayee = if (payee.isBlank()) {
+            "Payment via $appName"
+        } else {
+            cleanPayeeName(payee)
         }
 
         return ParsedPayment(
             amount = amount,
-            payee = payee,
+            payee = effectivePayee,
             sourceApp = appName,
             timestamp = System.currentTimeMillis()
         )
     }
 
     private fun cleanPayeeName(name: String): String {
-        return name
+        val cleaned = name
             .replace(Regex("(?i)^(the|m/s|vpa)\\s+"), "")
             .trim()
-            .split(" ")
+
+        // Format VPA like komaleakshay7@oksbi as "komaleakshay7 (SBI)"
+        if (cleaned.contains("@")) {
+            val parts = cleaned.split("@")
+            val handle = parts[0]
+            val bank = if (parts.size > 1) {
+                parts[1].replace(Regex("(?i)^ok"), "").uppercase()
+            } else {
+                "UPI"
+            }
+            return "$handle ($bank)"
+        }
+
+        return cleaned.split(" ")
             .joinToString(" ") { word ->
                 if (word.isNotEmpty()) word.substring(0, 1).uppercase() + word.substring(1).lowercase() else ""
             }
@@ -227,4 +316,3 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         }
     }
 }
-
