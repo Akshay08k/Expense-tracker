@@ -66,12 +66,15 @@ class PaymentActionReceiver : BroadcastReceiver() {
         MainActivity.notifyPaymentIfActive(paymentMap)
 
         // 3. Update the notification to show immediate confirmation, auto-dismissing in 5 seconds
+        PaymentNotificationListenerService.createNotificationChannel(context)
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val formattedAmount = if (amount % 1.0 == 0.0) amount.toInt().toString() else String.format("%.2f", amount)
         val noteSuffix = if (note.isNotBlank()) " • \"$note\"" else ""
 
         val confirmationTitle = if (isIncome) "✅ Income Saved: ₹$formattedAmount" else "✅ Expense Saved: ₹$formattedAmount"
         val confirmationText = "$title$noteSuffix (Recorded in FinFlow)"
+
+        val notifId = intent.getIntExtra("notif_id", NOTIFICATION_ID)
 
         val updatedNotification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -82,7 +85,7 @@ class PaymentActionReceiver : BroadcastReceiver() {
             .setTimeoutAfter(5000) // Automatically dismisses notification after 5 seconds!
             .build()
 
-        notificationManager.notify(NOTIFICATION_ID, updatedNotification)
+        notificationManager.notify(notifId, updatedNotification)
     }
 
     private fun saveTransactionNatively(

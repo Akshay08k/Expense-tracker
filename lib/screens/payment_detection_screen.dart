@@ -14,6 +14,7 @@ class PaymentDetectionScreen extends StatefulWidget {
 class _PaymentDetectionScreenState extends State<PaymentDetectionScreen>
     with WidgetsBindingObserver {
   bool _isPermissionGranted = false;
+  bool _isPostNotificationGranted = true;
   bool _isLoading = true;
 
   @override
@@ -39,9 +40,12 @@ class _PaymentDetectionScreenState extends State<PaymentDetectionScreen>
   Future<void> _checkPermission() async {
     setState(() => _isLoading = true);
     final granted = await PaymentDetectorService.isPermissionGranted();
+    final postGranted =
+        await PaymentDetectorService.isPostNotificationPermissionGranted();
     if (mounted) {
       setState(() {
         _isPermissionGranted = granted;
+        _isPostNotificationGranted = postGranted;
         _isLoading = false;
       });
     }
@@ -180,6 +184,71 @@ class _PaymentDetectionScreenState extends State<PaymentDetectionScreen>
               ],
             ),
           ),
+
+          if (!_isPostNotificationGranted) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade900.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Colors.amber.shade700.withOpacity(0.4),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.notification_important_rounded,
+                          color: Colors.amber.shade400, size: 22),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'App Notifications Needed',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'To show the [⚡ Quick Save] popup banner when payments occur, FinFlow needs permission to post notifications on Android 13+.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.amber.shade300,
+                        side: BorderSide(color: Colors.amber.shade700),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () async {
+                        await PaymentDetectorService
+                            .requestPostNotificationPermission();
+                        await _checkPermission();
+                      },
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: const Text('Allow Notifications'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           const SizedBox(height: 24),
 

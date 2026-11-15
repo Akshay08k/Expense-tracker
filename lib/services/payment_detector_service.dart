@@ -84,6 +84,24 @@ class PaymentDetectorService {
     }
   }
 
+  /// Check whether Android App Notification Posting permission is granted (Android 13+)
+  static Future<bool> isPostNotificationPermissionGranted() async {
+    try {
+      final result = await _channel
+          .invokeMethod<bool>('isPostNotificationPermissionGranted');
+      return result ?? true;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  /// Request runtime permission to post notifications (Android 13+)
+  static Future<void> requestPostNotificationPermission() async {
+    try {
+      await _channel.invokeMethod('requestPostNotificationPermission');
+    } catch (_) {}
+  }
+
   /// Open Android "Notification Access" system settings page
   static Future<void> openPermissionSettings() async {
     try {

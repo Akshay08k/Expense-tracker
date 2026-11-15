@@ -16,10 +16,13 @@ import java.util.regex.Pattern
 class PaymentNotificationListenerService : NotificationListenerService() {
 
     companion object {
-        private const val TAG = "FinFlowPaymentListener"
-        private const val CHANNEL_ID = "finflow_payment_detected"
-        private const val CHANNEL_NAME = "Detected Payments"
-        private const val NOTIFICATION_ID = 9001
+        const val TAG = "FinFlowPaymentListener"
+        const val CHANNEL_ID = "finflow_payment_detected"
+        const val CHANNEL_NAME = "Detected Payments"
+        const val NOTIFICATION_ID = 9001
+
+        private var lastProcessedAmount: Double = -1.0
+        private var lastProcessedTime: Long = 0L
 
         // Whitelisted payment, banking, and transactional notification apps
         val SUPPORTED_PACKAGES = mapOf(
@@ -54,18 +57,216 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
             // Truecaller (Smart Payment / UPI notification)
             "com.truecaller" to "Truecaller Pay",
+            "com.truecaller.messenger" to "Truecaller SMS",
 
-            // Default Messaging Apps (For Bank Debit/Credit SMS like BOBSMS - No READ_SMS permission needed!)
+            // Default & OEM Messaging Apps (For Bank Debit/Credit SMS like BOBSMS - Zero READ_SMS permission needed!)
             "com.google.android.apps.messaging" to "Bank SMS",
             "com.samsung.android.messaging" to "Bank SMS",
             "com.android.mms" to "Bank SMS",
-            "com.oneplus.mms" to "Bank SMS"
+            "com.oneplus.mms" to "Bank SMS",
+            "com.coloros.mms" to "Bank SMS",
+            "com.heytap.mms" to "Bank SMS",
+            "com.oppo.mms" to "Bank SMS",
+            "com.realme.mms" to "Bank SMS",
+            "com.xiaomi.mms" to "Bank SMS",
+            "com.miui.smsextra" to "Bank SMS",
+            "com.vivo.mms" to "Bank SMS",
+            "com.bbk.mms" to "Bank SMS",
+            "com.nothing.mms" to "Bank SMS"
         )
+
+        fun isSupportedPackage(packageName: String): Boolean {
+            if (SUPPORTED_PACKAGES.containsKey(packageName)) return true
+            val lower = packageName.lowercase(Locale.ROOT)
+            return lower.contains("messaging") ||
+                    lower.contains(".mms") ||
+                    lower.endsWith(".mms") ||
+                    lower.contains(".sms") ||
+                    lower.endsWith(".sms") ||
+                    lower.contains("smsextra") ||
+                    lower.contains("truecaller") ||
+                    lower.contains(".upi") ||
+                    lower.contains("bhim") ||
+                    lower.contains("banking")
+        }
+
+        fun createNotificationChannel(context: Context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    CHANNEL_ID,
+                    CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Notifies you when a UPI payment or bank debit is detected so you can record it in 1 tap"
+                    enableVibration(true)
+                    lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+                    setShowBadge(true)
+                }
+                val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                manager.createNotificationChannel(channel)
+            }
+        }
+
+        fun showPaymentNotification(
+            context: Context,
+            amount: Double,
+            payee: String,
+            sourceApp: String,
+            isIncome: Boolean = false,
+            timestamp: Long = System.currentTimeMillis()
+        ) {
+            createNotificationChannel(context)
+
+            val launchIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra("is_payment_detected", true)
+                putExtra("amount", amount)
+                putExtra("title", payee)
+                putExtra("source_app", sourceApp)
+                putExtra("is_income", isIncome)
+                putExtra("timestamp", timestamp)
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                (System.currentTimeMillis() % 10000).toInt(),
+                launchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val formattedAmount = if (amount % 1.0 == 0.0) {
+                amount.toInt().toString()
+            } else {
+                String.format(Locale.US, "%.2f", amount)
+            }
+
+            val notifId = (timestamp % 100000).toInt() + 100
+            val defaultCategoryId = if (isIncome) "salary" else predictCategoryNatively(payee)
+
+            // 1. Action: ⚡ Quick Save (Saves in background without opening app)
+            val quickSaveIntent = Intent(context, PaymentActionReceiver::class.java).apply {
+                action = PaymentActionReceiver.ACTION_QUICK_SAVE
+                putExtra("amount", amount)
+                putExtra("title", payee)
+                putExtra("source_app", sourceApp)
+                putExtra("is_income", isIncome)
+                putExtra("category_id", defaultCategoryId)
+                putExtra("notif_id", notifId)
+            }
+            val quickSavePendingIntent = PendingIntent.getBroadcast(
+                context,
+                (System.currentTimeMillis() % 10000 + 1).toInt(),
+                quickSaveIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val quickSaveAction = NotificationCompat.Action.Builder(
+                R.mipmap.ic_launcher,
+                "⚡ Quick Save",
+                quickSavePendingIntent
+            ).build()
+
+            // 2. Action: ✏️ Add Description (Inline text box right inside the notification)
+            val remoteInput = androidx.core.app.RemoteInput.Builder(PaymentActionReceiver.KEY_TEXT_REPLY)
+                .setLabel("Enter note or description...")
+                .build()
+
+            val addNoteIntent = Intent(context, PaymentActionReceiver::class.java).apply {
+                action = PaymentActionReceiver.ACTION_ADD_NOTE
+                putExtra("amount", amount)
+                putExtra("title", payee)
+                putExtra("source_app", sourceApp)
+                putExtra("is_income", isIncome)
+                putExtra("category_id", defaultCategoryId)
+                putExtra("notif_id", notifId)
+            }
+            val addNotePendingIntent = PendingIntent.getBroadcast(
+                context,
+                (System.currentTimeMillis() % 10000 + 2).toInt(),
+                addNoteIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
+            )
+            val addNoteAction = NotificationCompat.Action.Builder(
+                R.mipmap.ic_launcher,
+                "✏️ Add Description",
+                addNotePendingIntent
+            ).addRemoteInput(remoteInput).build()
+
+            val titleText = if (isIncome) {
+                "Income Received: ₹$formattedAmount"
+            } else {
+                "Payment Detected: ₹$formattedAmount"
+            }
+
+            val contentText = if (isIncome) {
+                "Received from $payee via $sourceApp."
+            } else {
+                "Paid to $payee via $sourceApp."
+            }
+
+            val bigText = if (isIncome) {
+                "Detected ₹$formattedAmount received from $payee. Tap Quick Save to record instantly, or add a description below."
+            } else {
+                "Detected ₹$formattedAmount paid to $payee. Tap Quick Save to record instantly, or add a description below."
+            }
+
+            val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(titleText)
+                .setContentText(contentText)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_EVENT)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .addAction(quickSaveAction)
+                .addAction(addNoteAction)
+
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.notify(notifId, builder.build())
+        }
+
+        fun predictCategoryNatively(payee: String): String {
+            val lower = payee.lowercase(Locale.ROOT)
+            if (lower.contains("zomato") || lower.contains("swiggy") || lower.contains("starbucks") ||
+                lower.contains("mcdonald") || lower.contains("burger") || lower.contains("pizza") ||
+                lower.contains("cafe") || lower.contains("tea") || lower.contains("chai") ||
+                lower.contains("restaurant") || lower.contains("bakery") || lower.contains("food")) {
+                return "food"
+            }
+            if (lower.contains("blinkit") || lower.contains("zepto") || lower.contains("instamart") ||
+                lower.contains("dmart") || lower.contains("grocery") || lower.contains("supermarket") ||
+                lower.contains("vegetable") || lower.contains("fruit") || lower.contains("dairy")) {
+                return "groceries"
+            }
+            if (lower.contains("uber") || lower.contains("ola") || lower.contains("rapido") ||
+                lower.contains("metro") || lower.contains("petrol") || lower.contains("fuel") ||
+                lower.contains("shell") || lower.contains("hpcl") || lower.contains("bpcl")) {
+                return "transport"
+            }
+            if (lower.contains("amazon") || lower.contains("flipkart") || lower.contains("myntra") ||
+                lower.contains("zara") || lower.contains("shopping") || lower.contains("mall")) {
+                return "shopping"
+            }
+            if (lower.contains("bescom") || lower.contains("airtel") || lower.contains("jio") ||
+                lower.contains("electricity") || lower.contains("wifi") || lower.contains("gas") || lower.contains("bill")) {
+                return "bills"
+            }
+            if (lower.contains("netflix") || lower.contains("spotify") || lower.contains("hotstar") ||
+                lower.contains("prime") || lower.contains("pvr") || lower.contains("cinema") || lower.contains("movie")) {
+                return "entertainment"
+            }
+            if (lower.contains("pharmacy") || lower.contains("apollo") || lower.contains("medplus") ||
+                lower.contains("hospital") || lower.contains("clinic") || lower.contains("doctor")) {
+                return "health"
+            }
+            return "food"
+        }
     }
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        createNotificationChannel(this)
         Log.d(TAG, "PaymentNotificationListenerService created")
     }
 
@@ -75,12 +276,15 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
         val packageName = sbn.packageName ?: return
 
-        // 1. FAST FILTER: Only inspect whitelisted packages (Zero Battery Drain)
-        if (!SUPPORTED_PACKAGES.containsKey(packageName)) {
+        // 1. FAST FILTER: Only inspect whitelisted/messaging packages (Zero Battery Drain)
+        if (!isSupportedPackage(packageName)) {
             return
         }
 
-        val appName = SUPPORTED_PACKAGES[packageName] ?: "UPI App"
+        val appName = SUPPORTED_PACKAGES[packageName] ?: if (
+            packageName.contains("mms") || packageName.contains("messaging") || packageName.contains("sms")
+        ) "Bank SMS" else "Banking App"
+
         val extras = sbn.notification?.extras ?: return
 
         val title = extras.getCharSequence("android.title")?.toString() ?: ""
@@ -89,11 +293,40 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         val subText = extras.getCharSequence("android.subText")?.toString() ?: ""
         val infoText = extras.getCharSequence("android.infoText")?.toString() ?: ""
 
-        val fullText = "$title $text $bigText $subText $infoText".trim()
+        val sb = StringBuilder()
+        sb.append(title).append(" ").append(text).append(" ").append(bigText).append(" ").append(subText).append(" ").append(infoText).append(" ")
+
+        // Also gather any other text lines in the extras bundle (handles Truecaller, OEM SMS styles)
+        try {
+            for (key in extras.keySet()) {
+                if (key != "android.title" && key != "android.text" && key != "android.bigText" &&
+                    key != "android.subText" && key != "android.infoText") {
+                    val value = extras.get(key)
+                    if (value is CharSequence) {
+                        sb.append(value).append(" ")
+                    } else if (value is Array<*> && value.isArrayOf<CharSequence>()) {
+                        for (item in value) {
+                            if (item != null) sb.append(item).append(" ")
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        val fullText = sb.toString().trim()
         Log.d(TAG, "Processing notification from $appName ($packageName): $fullText")
 
         // 2. Parse Amount, Payee/Merchant, and Transaction Type (Income vs Expense)
         val parsed = parseTransaction(fullText, title, text, appName, packageName) ?: return
+
+        // Deduplicate notifications arriving within 3 seconds for the same amount (e.g. Bank SMS + Truecaller)
+        val now = System.currentTimeMillis()
+        if (lastProcessedAmount == parsed.amount && (now - lastProcessedTime) < 3000) {
+            Log.d(TAG, "Dropping duplicate notification for amount ${parsed.amount} received within 3s")
+            return
+        }
+        lastProcessedAmount = parsed.amount
+        lastProcessedTime = now
 
         Log.d(TAG, "Successfully parsed transaction: Amount=${parsed.amount}, Payee=${parsed.payee}, isIncome=${parsed.isIncome}, App=${parsed.sourceApp}")
 
@@ -107,13 +340,18 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             "rawText" to fullText
         )
 
-        val handledInForeground = MainActivity.notifyPaymentIfActive(paymentData)
+        MainActivity.pendingPaymentData = paymentData
+        MainActivity.notifyPaymentIfActive(paymentData)
 
-        // 4. If app is in background or closed, show a high-priority heads-up prompt notification with Action Buttons
-        if (!handledInForeground) {
-            MainActivity.pendingPaymentData = paymentData
-            showDetectedNotification(parsed)
-        }
+        // 4. Always show the heads-up notification banner with Action Buttons ([⚡ Quick Save] & [✏️ Add Description])
+        showPaymentNotification(
+            context = this,
+            amount = parsed.amount,
+            payee = parsed.payee,
+            sourceApp = parsed.sourceApp,
+            isIncome = parsed.isIncome,
+            timestamp = parsed.timestamp
+        )
     }
 
     data class ParsedPayment(
@@ -131,7 +369,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         appName: String,
         packageName: String
     ): ParsedPayment? {
-        val lower = fullText.lowercase()
+        val lower = fullText.lowercase(Locale.ROOT)
 
         // Ignore OTP, login, password, or non-transaction alerts
         if (lower.contains("otp") || lower.contains("login") || lower.contains("code") ||
@@ -153,9 +391,9 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         }
 
         // For SMS messaging apps: Ensure it's from a bank/financial sender or has transaction keywords
-        val isMessagingApp = packageName.contains("messaging") || packageName.contains("mms")
+        val isMessagingApp = packageName.contains("messaging") || packageName.contains("mms") || packageName.contains("sms")
         if (isMessagingApp) {
-            val isBankSender = title.matches(Regex("(?i).*(bob|sbi|hdfc|icici|axis|kotak|pnb|canara|union|idfc|paytm|upi|sms|alert|bank|citi|rbl|indus|yesb|bop|baroda).*"))
+            val isBankSender = title.matches(Regex("(?i).*(bob|sbi|hdfc|icici|axis|kotak|pnb|canara|canbnk|union|idfc|paytm|upi|sms|alert|bank|citi|rbl|indus|yesb|bop|baroda|iob|idbi|fedbk|scb|central|corp|dena|synd|vijaya|maha|punjab|fss|cred).*"))
             val hasDebitIndicator = lower.contains("dr.") || lower.contains("dr ") ||
                     lower.contains("debited") || lower.contains("withdrawn") ||
                     lower.contains("spent") || lower.contains("paid") || lower.contains("cr. to")
@@ -166,9 +404,10 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
         // Must indicate a payment, debit, income, transfer, OR have currency symbol with a payee
         val hasDebitKeyword = lower.contains("paid") || lower.contains("sent") ||
-                lower.contains("debited") || lower.contains("successful") ||
-                lower.contains("transfer to") || lower.contains("payment to") ||
-                lower.contains("spent") || lower.contains("dr.") || lower.contains("dr ") ||
+                lower.contains("debited") || lower.contains("withdrawn") ||
+                lower.contains("successful") || lower.contains("transfer to") ||
+                lower.contains("payment to") || lower.contains("spent") ||
+                lower.contains("dr.") || lower.contains("dr ") ||
                 lower.contains("cr. to") || lower.contains("cr to")
 
         val hasCurrencySymbol = fullText.contains("₹") || lower.contains("rs.") || lower.contains("rs ") || lower.contains("inr")
@@ -179,7 +418,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
         // Regex for Amount: Handles Rs.10.00, Rs 10, ₹10, INR 1,250.50, Paid 10, Received 500, etc.
         val amountPattern = Pattern.compile(
-            "(?:(?:₹|rs\\.?|inr|paid|received|debited by|debited for)\\s*[:.]?\\s*([0-9,]+(?:\\.[0-9]{1,2})?))",
+            "(?:(?:₹|rs\\.?|inr|paid|received|debited by|debited for|debited with|debited of|spent)\\s*[:.]?\\s*([0-9,]+(?:\\.[0-9]{1,2})?))",
             Pattern.CASE_INSENSITIVE
         )
         val amountMatcher = amountPattern.matcher(fullText)
@@ -284,7 +523,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             val parts = cleaned.split("@")
             val handle = parts[0]
             val bank = if (parts.size > 1) {
-                parts[1].replace(Regex("(?i)^ok"), "").uppercase()
+                parts[1].replace(Regex("(?i)^ok"), "").uppercase(Locale.ROOT)
             } else {
                 "UPI"
             }
@@ -293,165 +532,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
         return cleaned.split(" ")
             .joinToString(" ") { word ->
-                if (word.isNotEmpty()) word.substring(0, 1).uppercase() + word.substring(1).lowercase() else ""
+                if (word.isNotEmpty()) word.substring(0, 1).uppercase(Locale.ROOT) + word.substring(1).lowercase(Locale.ROOT) else ""
             }
-    }
-
-    private fun predictCategoryNatively(payee: String): String {
-        val lower = payee.lowercase(Locale.ROOT)
-        if (lower.contains("zomato") || lower.contains("swiggy") || lower.contains("starbucks") ||
-            lower.contains("mcdonald") || lower.contains("burger") || lower.contains("pizza") ||
-            lower.contains("cafe") || lower.contains("tea") || lower.contains("chai") ||
-            lower.contains("restaurant") || lower.contains("bakery") || lower.contains("food")) {
-            return "food"
-        }
-        if (lower.contains("blinkit") || lower.contains("zepto") || lower.contains("instamart") ||
-            lower.contains("dmart") || lower.contains("grocery") || lower.contains("supermarket") ||
-            lower.contains("vegetable") || lower.contains("fruit") || lower.contains("dairy")) {
-            return "groceries"
-        }
-        if (lower.contains("uber") || lower.contains("ola") || lower.contains("rapido") ||
-            lower.contains("metro") || lower.contains("petrol") || lower.contains("fuel") ||
-            lower.contains("shell") || lower.contains("hpcl") || lower.contains("bpcl")) {
-            return "transport"
-        }
-        if (lower.contains("amazon") || lower.contains("flipkart") || lower.contains("myntra") ||
-            lower.contains("zara") || lower.contains("shopping") || lower.contains("mall")) {
-            return "shopping"
-        }
-        if (lower.contains("bescom") || lower.contains("airtel") || lower.contains("jio") ||
-            lower.contains("electricity") || lower.contains("wifi") || lower.contains("gas") || lower.contains("bill")) {
-            return "bills"
-        }
-        if (lower.contains("netflix") || lower.contains("spotify") || lower.contains("hotstar") ||
-            lower.contains("prime") || lower.contains("pvr") || lower.contains("cinema") || lower.contains("movie")) {
-            return "entertainment"
-        }
-        if (lower.contains("pharmacy") || lower.contains("apollo") || lower.contains("medplus") ||
-            lower.contains("hospital") || lower.contains("clinic") || lower.contains("doctor")) {
-            return "health"
-        }
-        return "food"
-    }
-
-    private fun showDetectedNotification(payment: ParsedPayment) {
-        val launchIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-            putExtra("is_payment_detected", true)
-            putExtra("amount", payment.amount)
-            putExtra("title", payment.payee)
-            putExtra("source_app", payment.sourceApp)
-            putExtra("is_income", payment.isIncome)
-            putExtra("timestamp", payment.timestamp)
-        }
-
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            (System.currentTimeMillis() % 10000).toInt(),
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val formattedAmount = if (payment.amount % 1.0 == 0.0) {
-            payment.amount.toInt().toString()
-        } else {
-            String.format("%.2f", payment.amount)
-        }
-
-        val defaultCategoryId = if (payment.isIncome) "salary" else predictCategoryNatively(payment.payee)
-
-        // 1. Action: ⚡ Quick Save (Saves in background without opening app)
-        val quickSaveIntent = Intent(this, PaymentActionReceiver::class.java).apply {
-            action = PaymentActionReceiver.ACTION_QUICK_SAVE
-            putExtra("amount", payment.amount)
-            putExtra("title", payment.payee)
-            putExtra("source_app", payment.sourceApp)
-            putExtra("is_income", payment.isIncome)
-            putExtra("category_id", defaultCategoryId)
-        }
-        val quickSavePendingIntent = PendingIntent.getBroadcast(
-            this,
-            (System.currentTimeMillis() % 10000 + 1).toInt(),
-            quickSaveIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val quickSaveAction = NotificationCompat.Action.Builder(
-            R.mipmap.ic_launcher,
-            "⚡ Quick Save",
-            quickSavePendingIntent
-        ).build()
-
-        // 2. Action: ✏️ Add Description (Inline text box right inside the notification)
-        val remoteInput = androidx.core.app.RemoteInput.Builder(PaymentActionReceiver.KEY_TEXT_REPLY)
-            .setLabel("Enter note or description...")
-            .build()
-
-        val addNoteIntent = Intent(this, PaymentActionReceiver::class.java).apply {
-            action = PaymentActionReceiver.ACTION_ADD_NOTE
-            putExtra("amount", payment.amount)
-            putExtra("title", payment.payee)
-            putExtra("source_app", payment.sourceApp)
-            putExtra("is_income", payment.isIncome)
-            putExtra("category_id", defaultCategoryId)
-        }
-        val addNotePendingIntent = PendingIntent.getBroadcast(
-            this,
-            (System.currentTimeMillis() % 10000 + 2).toInt(),
-            addNoteIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
-        )
-        val addNoteAction = NotificationCompat.Action.Builder(
-            R.mipmap.ic_launcher,
-            "✏️ Add Description",
-            addNotePendingIntent
-        ).addRemoteInput(remoteInput).build()
-
-        val titleText = if (payment.isIncome) {
-            "Income Received: ₹$formattedAmount"
-        } else {
-            "Payment Detected: ₹$formattedAmount"
-        }
-
-        val contentText = if (payment.isIncome) {
-            "Received from ${payment.payee} via ${payment.sourceApp}."
-        } else {
-            "Paid to ${payment.payee} via ${payment.sourceApp}."
-        }
-
-        val bigText = if (payment.isIncome) {
-            "Detected ₹$formattedAmount received from ${payment.payee}. Quick-Save directly or add a note below."
-        } else {
-            "Detected ₹$formattedAmount paid to ${payment.payee}. Quick-Save directly or add a note below."
-        }
-
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(titleText)
-            .setContentText(contentText)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_EVENT)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .addAction(quickSaveAction)
-            .addAction(addNoteAction)
-
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(NOTIFICATION_ID, builder.build())
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Notifies you when a UPI or card payment is detected so you can record it in 1 tap"
-                enableVibration(true)
-            }
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
-        }
     }
 }

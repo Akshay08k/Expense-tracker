@@ -3,6 +3,7 @@ package com.personal.expensetracker.expense_tracker
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -34,11 +35,32 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
         activeInstance = this
         extractPaymentFromIntent(intent)
+        requestPostNotificationPermissionIfNeeded()
+    }
+
+    private fun requestPostNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 999)
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
         activeInstance = this
+
+        // Automatically ensure NotificationListenerService is bound and active
+        if (isNotificationServiceEnabled(this)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                try {
+                    val componentName = ComponentName(this, PaymentNotificationListenerService::class.java)
+                    android.service.notification.NotificationListenerService.requestRebind(componentName)
+                } catch (e: Exception) {
+                    // Ignored if already bound or restricted by OEM
+                }
+            }
+        }
     }
 
     override fun onPause() {
@@ -98,6 +120,18 @@ class MainActivity : FlutterActivity() {
                     openNotificationSettings(context)
                     result.success(true)
                 }
+                "isPostNotificationPermissionGranted" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val granted = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                        result.success(granted)
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "requestPostNotificationPermission" -> {
+                    requestPostNotificationPermissionIfNeeded()
+                    result.success(true)
+                }
                 "getPendingPayment" -> {
                     val data = pendingPaymentData
                     pendingPaymentData = null // clear once read
@@ -119,6 +153,15 @@ class MainActivity : FlutterActivity() {
 
                     pendingPaymentData = dummyData
                     methodChannel?.invokeMethod("onPaymentDetected", dummyData)
+
+                    // Also display the real Android heads-up notification with action buttons!
+                    PaymentNotificationListenerService.showPaymentNotification(
+                        context = this,
+                        amount = amount,
+                        payee = payee,
+                        sourceApp = appName,
+                        isIncome = isIncome
+                    )
                     result.success(true)
                 }
                 else -> {
