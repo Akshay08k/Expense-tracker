@@ -39,6 +39,16 @@
             </intent-filter>
         </service>
 
+        <!-- Notification Quick Action & Inline Reply Receiver -->
+        <receiver
+            android:name=".PaymentActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.personal.expensetracker.ACTION_QUICK_SAVE" />
+                <action android:name="com.personal.expensetracker.ACTION_ADD_NOTE" />
+            </intent-filter>
+        </receiver>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

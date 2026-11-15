@@ -54,7 +54,7 @@ Every entry, edit, or balance adjustment syncs seamlessly in the background to a
 - **Formatted Month-Ending Reports**: Monthly sheets feature grouped category spending tables (`Count`, `Total`, `% of Month`), burn rate KPI strips, color-coded badges (`INCOME`, `EXPENSE`, `TRANSFER`), zebra-striped rows, and frozen header rows.
 
 ### Personal Finance Management
-- **Instant Payment Auto-Detection (Android)**: Captures payments in real-time from Google Pay, PhonePe, Paytm, CRED, BHIM, and bank push notifications. Pops up a prefilled sheet with Amount, Payee, and predicted Category so you can review and save in 1 tap.
+- **Instant Payment & Income Auto-Detection (Android)**: Captures both outgoing expenses and incoming credits in real-time from Google Pay, PhonePe, Paytm, CRED, BHIM, Truecaller, and bank debit/credit notifications. Pops up a prefilled sheet with Amount, Payee/Sender, and smart category selection (Expense vs. Income) to review and save in 1 tap.
 - **Battery-Friendly & 100% Private**: Event-driven native Android listener that sleeps until a payment arrives (<0.1% daily battery). Never accesses or reads your SMS inbox, OTPs, or private chats.
 - **Multi-Account & Wallet Support**: Manage distinct balances across Bank Accounts, Cash in Hand, and Savings or Emergency Funds with account-to-account transfer tracking.
 - **Payment Mode Classification**: Tag payments by Cash, UPI (GPay, PhonePe, Paytm), Debit/Credit Cards, or Net Banking.
@@ -213,11 +213,11 @@ If you prefer keeping your data strictly local or sharing via external channels:
 ## Changelog
 
 ### v1.3.0
-- **Instant Payment Auto-Detection (Android)**: Real-time background detection of UPI and card payment alerts (Google Pay, PhonePe, Paytm, CRED, BHIM, Amazon Pay, and banking apps) via native Android `NotificationListenerService`.
-- **Pre-filled Transaction Prompt**: Automatically extracts Amount, Payee/Merchant name, and Timestamp, displaying an interactive heads-up notification that opens directly into a pre-filled entry sheet.
-- **Smart Category Prediction**: Contextual keyword engine that automatically pre-selects the appropriate category (Food & Dining, Groceries, Transport, Bills, Shopping, Health, Entertainment) based on merchant names.
-- **Privacy-First & Zero Battery Drain**: Operates on native OS event callbacks (<0.1% daily battery impact) and completely eliminates the security risks of SMS scraping (no SMS/OTP access required).
-- **Payment Detection & Simulator Hub**: Dedicated management screen with live permission status, one-tap access to Android Notification Access settings, and built-in transaction simulators for testing.
+- **Instant Payment & Income Auto-Detection (Android)**: Real-time background detection of both outgoing payments and incoming money (Salary, UPI credits, bank deposits) from Google Pay, PhonePe, Paytm, CRED, BHIM, Bank of Baroda, Truecaller, and bank alerts.
+- **Notification Quick Actions & Inline Description**: Save transactions directly from the Android notification banner with `⚡ Quick Save` or type a description using native `✏️ Add Description` inline reply without opening any app.
+- **Smart Category & Type Classification**: Automatically differentiates between Expense (debit) and Income (credit), prefilling the appropriate tab, sender/payee, and smart-predicted category.
+- **Privacy-First & Zero Battery Drain**: Operates entirely on native OS event callbacks (<0.1% daily battery impact) and completely eliminates the security risks of SMS scraping (no SMS/OTP inbox access required).
+- **Payment Detection & Simulator Hub**: Dedicated management screen with live permission status, one-tap access to Android Notification Access settings, and built-in transaction simulators for testing both debits and credits.
 
 ### v1.2.0
 - **Instant Cloud Auto-Sync Engine**: Non-blocking background sync to Google Sheets on every record creation, edit, or deletion with offline fallback.

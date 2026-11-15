@@ -45,6 +45,22 @@ void main() {
       expect(PaymentDetectorService.predictCategoryId('Netflix Subscription'), 'entertainment');
       expect(PaymentDetectorService.predictCategoryId('Apollo Pharmacy'), 'health');
       expect(PaymentDetectorService.predictCategoryId('Airtel Postpaid Recharge'), 'bills');
+      expect(PaymentDetectorService.predictCategoryId('Monthly Salary Deposit'), 'salary');
+      expect(PaymentDetectorService.predictCategoryId('Zerodha Dividend'), 'investment');
+    });
+
+    test('DetectedPayment.fromMap parses isIncome properly', () {
+      final map = {
+        'amount': 2500.0,
+        'title': 'Amit Patel',
+        'sourceApp': 'Google Pay',
+        'isIncome': true,
+      };
+
+      final payment = DetectedPayment.fromMap(map);
+      expect(payment.amount, 2500.0);
+      expect(payment.title, 'Amit Patel');
+      expect(payment.isIncome, true);
     });
   });
 }

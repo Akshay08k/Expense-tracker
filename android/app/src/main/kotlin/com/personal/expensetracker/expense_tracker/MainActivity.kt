@@ -70,6 +70,7 @@ class MainActivity : FlutterActivity() {
             val amount = intent.getDoubleExtra("amount", 0.0)
             val title = intent.getStringExtra("title") ?: "Payment"
             val sourceApp = intent.getStringExtra("source_app") ?: "UPI"
+            val isIncome = intent.getBooleanExtra("is_income", false)
             val timestamp = intent.getLongExtra("timestamp", System.currentTimeMillis())
 
             if (amount > 0.0) {
@@ -77,6 +78,7 @@ class MainActivity : FlutterActivity() {
                     "amount" to amount,
                     "title" to title,
                     "sourceApp" to sourceApp,
+                    "isIncome" to isIncome,
                     "timestamp" to timestamp
                 )
             }
@@ -105,11 +107,13 @@ class MainActivity : FlutterActivity() {
                     val amount = (call.argument<Number>("amount"))?.toDouble() ?: 150.0
                     val payee = call.argument<String>("payee") ?: "Starbucks Coffee"
                     val appName = call.argument<String>("sourceApp") ?: "Google Pay"
+                    val isIncome = call.argument<Boolean>("isIncome") ?: false
 
                     val dummyData = hashMapOf<String, Any>(
                         "amount" to amount,
                         "title" to payee,
                         "sourceApp" to appName,
+                        "isIncome" to isIncome,
                         "timestamp" to System.currentTimeMillis()
                     )
 

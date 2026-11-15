@@ -315,47 +315,53 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (widget.detectedSourceApp != null) ...[
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 14),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.bolt_rounded, color: AppColors.primary, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Auto-detected from ${widget.detectedSourceApp}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
+                    Builder(builder: (context) {
+                      final isIncome = _selectedType == TransactionType.income;
+                      final badgeColor = isIncome ? AppColors.income : AppColors.primary;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: badgeColor.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.bolt_rounded, color: badgeColor, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                isIncome
+                                    ? 'Auto-detected Income from ${widget.detectedSourceApp}'
+                                    : 'Auto-detected Expense from ${widget.detectedSourceApp}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: badgeColor,
+                                ),
                               ),
                             ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'PREFILLED',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: badgeColor,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                isIncome ? 'INCOME' : 'PREFILLED',
+                                style: const TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                   // Type Selector: Expense, Income, Transfer
                   Container(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/transaction.dart';
 import '../services/payment_detector_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/quick_add_sheet.dart';
@@ -312,6 +313,16 @@ class _PaymentDetectionScreenState extends State<PaymentDetectionScreen>
             sourceApp: 'Bank of Baroda / Truecaller',
             isDark: isDark,
           ),
+          const SizedBox(height: 8),
+          _buildTestButton(
+            title: 'Simulate Income Received',
+            subtitle: 'Received ₹2,500 from Amit Patel',
+            amount: 2500.0,
+            payee: 'Amit Patel',
+            sourceApp: 'Google Pay',
+            isIncome: true,
+            isDark: isDark,
+          ),
           const SizedBox(height: 30),
         ],
       ),
@@ -406,22 +417,29 @@ class _PaymentDetectionScreenState extends State<PaymentDetectionScreen>
     required double amount,
     required String payee,
     required String sourceApp,
+    bool isIncome = false,
     required bool isDark,
   }) {
+    final themeColor = isIncome ? AppColors.income : AppColors.primary;
     return InkWell(
       onTap: () {
         PaymentDetectorService.simulateTestPayment(
           amount: amount,
           payee: payee,
           sourceApp: sourceApp,
+          isIncome: isIncome,
         );
         // Also open directly if desired
         QuickAddSheet.show(
           context,
+          initialType:
+              isIncome ? TransactionType.income : TransactionType.expense,
           prefilledAmount: amount,
           prefilledTitle: payee,
           prefilledDate: DateTime.now(),
-          prefilledCategoryId: PaymentDetectorService.predictCategoryId(payee),
+          prefilledCategoryId: isIncome
+              ? 'salary'
+              : PaymentDetectorService.predictCategoryId(payee),
           detectedSourceApp: sourceApp,
         );
       },
@@ -432,7 +450,7 @@ class _PaymentDetectionScreenState extends State<PaymentDetectionScreen>
           color: isDark ? AppColors.darkCard : AppColors.lightBackground,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: AppColors.primary.withOpacity(0.3),
+            color: themeColor.withOpacity(0.3),
           ),
         ),
         child: Row(
@@ -440,11 +458,10 @@ class _PaymentDetectionScreenState extends State<PaymentDetectionScreen>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.12),
+                color: themeColor.withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.bolt_rounded,
-                  color: AppColors.primary, size: 20),
+              child: Icon(Icons.bolt_rounded, color: themeColor, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -470,8 +487,7 @@ class _PaymentDetectionScreenState extends State<PaymentDetectionScreen>
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded,
-                size: 14, color: AppColors.primary),
+            Icon(Icons.arrow_forward_ios_rounded, size: 14, color: themeColor),
           ],
         ),
       ),

@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/transaction.dart';
 import '../services/payment_detector_service.dart';
+import '../state/tracker_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/quick_add_sheet.dart';
 import 'accounts_screen.dart';
@@ -46,6 +49,7 @@ class _MainNavigationState extends State<MainNavigation>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      context.read<TrackerProvider>().reloadFromStorage();
       _checkPendingPayment();
     }
   }
@@ -61,11 +65,16 @@ class _MainNavigationState extends State<MainNavigation>
     if (_isPromptOpen || !mounted) return;
     _isPromptOpen = true;
 
-    final predictedCategory =
-        PaymentDetectorService.predictCategoryId(payment.title);
+    final initialType =
+        payment.isIncome ? TransactionType.income : TransactionType.expense;
+
+    final predictedCategory = payment.isIncome
+        ? 'salary'
+        : PaymentDetectorService.predictCategoryId(payment.title);
 
     QuickAddSheet.show(
       context,
+      initialType: initialType,
       prefilledAmount: payment.amount,
       prefilledTitle: payment.title,
       prefilledDate: payment.timestamp,

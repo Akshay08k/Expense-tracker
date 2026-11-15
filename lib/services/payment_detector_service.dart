@@ -8,6 +8,7 @@ class DetectedPayment {
   final String title;
   final String sourceApp;
   final DateTime timestamp;
+  final bool isIncome;
   final String? rawText;
 
   DetectedPayment({
@@ -15,6 +16,7 @@ class DetectedPayment {
     required this.title,
     required this.sourceApp,
     required this.timestamp,
+    this.isIncome = false,
     this.rawText,
   });
 
@@ -29,11 +31,15 @@ class DetectedPayment {
         ? DateTime.fromMillisecondsSinceEpoch(ts.toInt())
         : DateTime.now();
 
+    final isIncome = map['isIncome'] == true;
+
     return DetectedPayment(
       amount: amount,
-      title: (map['title'] as String?)?.trim() ?? 'Payment',
+      title: (map['title'] as String?)?.trim() ??
+          (isIncome ? 'Income' : 'Payment'),
       sourceApp: (map['sourceApp'] as String?)?.trim() ?? 'UPI',
       timestamp: timestamp,
+      isIncome: isIncome,
       rawText: map['rawText'] as String?,
     );
   }
@@ -106,12 +112,14 @@ class PaymentDetectorService {
     double amount = 150.0,
     String payee = 'Starbucks Coffee',
     String sourceApp = 'Google Pay',
+    bool isIncome = false,
   }) async {
     try {
       await _channel.invokeMethod('simulatePaymentNotification', {
         'amount': amount,
         'payee': payee,
         'sourceApp': sourceApp,
+        'isIncome': isIncome,
       });
     } catch (e) {
       debugPrint('Error simulating payment: $e');
@@ -121,6 +129,25 @@ class PaymentDetectorService {
   /// Intelligent category predictor based on merchant/payee name
   static String predictCategoryId(String payee) {
     final lower = payee.toLowerCase();
+
+    // Salary / Income
+    if (lower.contains('salary') ||
+        lower.contains('stipend') ||
+        lower.contains('payroll') ||
+        lower.contains('wages') ||
+        lower.contains('bonus')) {
+      return 'salary';
+    }
+
+    // Investments / Dividends
+    if (lower.contains('dividend') ||
+        lower.contains('interest') ||
+        lower.contains('groww') ||
+        lower.contains('zerodha') ||
+        lower.contains('upstox') ||
+        lower.contains('mutual fund')) {
+      return 'investment';
+    }
 
     // Food & Dining
     if (lower.contains('zomato') ||

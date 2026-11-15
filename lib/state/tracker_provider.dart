@@ -52,6 +52,14 @@ class TrackerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Reload data from persistent storage (e.g. after background notification save)
+  void reloadFromStorage() {
+    _loadFromStorage();
+    if (isGoogleSheetsConnected) {
+      _triggerAutoSync();
+    }
+  }
+
   Account? getAccountById(String id) {
     try {
       return _accounts.firstWhere((acc) => acc.id == id);
