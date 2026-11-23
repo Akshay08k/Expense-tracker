@@ -115,9 +115,20 @@ class GoogleSheetsService {
         );
       }
     } catch (e) {
+      final errorStr = e.toString();
+      String userFriendlyMessage = 'Network or sync error: $e';
+
+      if (errorStr.contains('Failed host lookup') || errorStr.contains('SocketException') || errorStr.contains('No address associated with hostname')) {
+        userFriendlyMessage = 'Cannot connect to Google Sheets. Please check your device\'s internet connection (Wi-Fi or Mobile Data) and try again.';
+      } else if (errorStr.contains('TimeoutException')) {
+        userFriendlyMessage = 'Connection timed out. Google Sheets took too long to respond. Please check your internet connection.';
+      } else if (errorStr.contains('401') || errorStr.contains('403')) {
+        userFriendlyMessage = 'Access denied by Google. Please ensure your Apps Script deployment has "Who has access" set to "Anyone".';
+      }
+
       return GoogleSheetsSyncResult(
         success: false,
-        message: 'Network or sync error: $e',
+        message: userFriendlyMessage,
       );
     }
   }
@@ -179,9 +190,20 @@ class GoogleSheetsService {
         );
       }
     } catch (e) {
+      final errorStr = e.toString();
+      String userFriendlyMessage = 'Failed to pull data from Google Sheets: $e';
+
+      if (errorStr.contains('Failed host lookup') || errorStr.contains('SocketException') || errorStr.contains('No address associated with hostname')) {
+        userFriendlyMessage = 'Cannot connect to Google Sheets. Please check your device\'s internet connection (Wi-Fi or Mobile Data) and try again.';
+      } else if (errorStr.contains('TimeoutException')) {
+        userFriendlyMessage = 'Connection timed out while fetching from Google Sheets.';
+      } else if (errorStr.contains('401') || errorStr.contains('403')) {
+        userFriendlyMessage = 'Access denied by Google. Please ensure your Apps Script deployment has "Who has access" set to "Anyone".';
+      }
+
       return GoogleSheetsSyncResult(
         success: false,
-        message: 'Failed to pull data from Google Sheets: $e',
+        message: userFriendlyMessage,
       );
     }
   }
