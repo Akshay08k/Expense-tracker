@@ -291,6 +291,15 @@ class _PaymentDetectionScreenState extends State<PaymentDetectionScreen>
                 'Detects Amount, Payee & Time. You simply verify the category and tap Save.',
             isDark: isDark,
           ),
+          const SizedBox(height: 8),
+          _buildInfoRow(
+            icon: Icons.filter_alt_off_rounded,
+            color: const Color(0xFFF59E0B),
+            title: 'Anti-Spam & Promo Shield',
+            subtitle:
+                'Ignores pre-approved loans, cashback reward games, promotional SMS (-P headers), and marketing alerts.',
+            isDark: isDark,
+          ),
 
           const SizedBox(height: 24),
 

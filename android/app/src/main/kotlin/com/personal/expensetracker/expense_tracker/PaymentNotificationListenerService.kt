@@ -371,7 +371,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
     ): ParsedPayment? {
         val lower = fullText.lowercase(Locale.ROOT)
 
-        // Ignore OTP, login, password, or non-transaction alerts
+        // 1. Ignore OTP, login, password, or security alerts
         if (lower.contains("otp") || lower.contains("login") || lower.contains("code") ||
             lower.contains("secret") || lower.contains("password") ||
             lower.contains("cashback received") || lower.contains("offers")
@@ -379,15 +379,69 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             return null
         }
 
-        // Determine whether this transaction is an INCOME (received/credit) or EXPENSE (paid/debit)
+        // 2. SENDER HEADER: In India, TRAI headers ending in "-P" (e.g. JX-KOTAKB-P, VM-HDFCBK-P) are PROMOTIONAL
+        if (title.matches(Regex("(?i).+-[A-Z0-9]+-P$"))) {
+            Log.d(TAG, "Ignoring promotional SMS header: $title")
+            return null
+        }
+
+        // 3. STRICT ANTI-PROMOTIONAL GATE:
+        // Ignore loans, pre-approved advances, cashback gamification, credit limit increases, and marketing promos
+        val isPromotional = lower.contains("pre-approved") || lower.contains("pre approved") ||
+                lower.contains("pre-qualified") || lower.contains("pre qualified") ||
+                lower.contains("instant loan") || lower.contains("personal loan") ||
+                lower.contains("advance is here") || lower.contains("payments away") ||
+                lower.contains("payment away") || lower.contains("unlock guaranteed") ||
+                lower.contains("unlock cashback") || lower.contains("guaranteed cashback") ||
+                lower.contains("cashback on") || lower.contains("cashback of") ||
+                lower.contains("win up to") || lower.contains("earn up to") ||
+                lower.contains("stand a chance") || lower.contains("spin and win") ||
+                lower.contains("scratch card") || lower.contains("apply now") ||
+                lower.contains("avail now") || lower.contains("eligible for") ||
+                lower.contains("credit limit") || lower.contains("increase limit") ||
+                lower.contains("upgrade your") || lower.contains("t&c") ||
+                lower.contains("terms and conditions") || lower.contains("sweet time") ||
+                lower.contains("exclusive offer") || lower.contains("special offer") ||
+                lower.contains("discount on") || lower.contains("coupon code") ||
+                lower.contains("refer and earn") || lower.contains("invite friends") ||
+                lower.contains("refer friends") || lower.contains("bill due") ||
+                lower.contains("payment due") || lower.contains("due date") ||
+                lower.contains("due on") || lower.contains("overdue") ||
+                lower.contains("hurry") || lower.contains("don't miss") ||
+                lower.contains("recharge now") || lower.contains("book now") ||
+                lower.contains("order now") || lower.contains("get flat") ||
+                lower.contains("earn flat") || lower.contains("complete 3 payments") ||
+                lower.contains("complete payments") || lower.contains("make payments") ||
+                lower.contains("cashback reward") || lower.contains("reward points") ||
+                lower.contains("unlock offer") || lower.contains("claim your offer") ||
+                lower.contains("congratulations! you are eligible")
+
+        if (isPromotional) {
+            Log.d(TAG, "Ignoring promotional/marketing notification: $fullText")
+            return null
+        }
+
+        // 4. Legitimate Salary Credit Verification (must be an actual credit, not marketing/loan offer)
+        val hasSalaryCredit = lower.contains("salary credited") ||
+                lower.contains("credited towards salary") ||
+                lower.contains("salary deposited") ||
+                lower.contains("salary for ") ||
+                (lower.contains("salary") && (lower.contains("credited") || lower.contains("deposited") || lower.contains("received")))
+
+        // 5. Determine whether this transaction is an INCOME (received/credit)
         var isIncome = false
         if (lower.contains("received") || lower.contains("credited with") ||
-            lower.contains("credited by") || lower.contains("deposited") ||
-            lower.contains("deposited into") || lower.contains("credited to a/c") ||
+            lower.contains("credited by") || lower.contains("deposited into") ||
+            lower.contains("deposited to") || lower.contains("credited to a/c") ||
+            lower.contains("credited to your a/c") || lower.contains("credited to your account") ||
             lower.contains("cr to a/c") || lower.contains("cr. to a/c") ||
-            lower.contains("salary") || lower.contains("refund")
+            lower.contains("refund of") || lower.contains("refund credited") ||
+            hasSalaryCredit
         ) {
-            isIncome = true
+            // Guard: If SMS says "Dr. from A/C" or "debited from A/C", it is an EXPENSE debit, NOT income!
+            if (!lower.contains("dr. from") && !lower.contains("dr from") && !lower.contains("debited from")) {
+                isIncome = true
+            }
         }
 
         // For SMS messaging apps: Ensure it's from a bank/financial sender or has transaction keywords
@@ -402,17 +456,17 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        // Must indicate a payment, debit, income, transfer, OR have currency symbol with a payee
+        // 6. Must indicate a clear past-action Debit, an Income receipt, OR Truecaller VPA transaction
         val hasDebitKeyword = lower.contains("paid") || lower.contains("sent") ||
                 lower.contains("debited") || lower.contains("withdrawn") ||
-                lower.contains("successful") || lower.contains("transfer to") ||
-                lower.contains("payment to") || lower.contains("spent") ||
                 lower.contains("dr.") || lower.contains("dr ") ||
-                lower.contains("cr. to") || lower.contains("cr to")
+                lower.contains("cr. to") || lower.contains("cr to") ||
+                lower.contains("transferred to") || lower.contains("transfer to") ||
+                (lower.contains("successful") && (lower.contains("payment") || lower.contains("transfer") || lower.contains("paid")))
 
-        val hasCurrencySymbol = fullText.contains("₹") || lower.contains("rs.") || lower.contains("rs ") || lower.contains("inr")
+        val isTruecallerVpa = packageName.contains("truecaller") && title.contains("@")
 
-        if (!isIncome && !hasDebitKeyword && !hasCurrencySymbol) {
+        if (!isIncome && !hasDebitKeyword && !isTruecallerVpa) {
             return null
         }
 
@@ -486,7 +540,11 @@ class PaymentNotificationListenerService : NotificationListenerService() {
                 val toMatcher = toPattern.matcher(fullText)
                 if (toMatcher.find()) {
                     val extracted = toMatcher.group(1)?.trim()
-                    if (!extracted.isNullOrBlank() && !extracted.equals("you", ignoreCase = true) && !extracted.equals("a/c", ignoreCase = true)) {
+                    if (!extracted.isNullOrBlank() && !extracted.equals("you", ignoreCase = true) &&
+                        !extracted.equals("a/c", ignoreCase = true) &&
+                        !extracted.equals("friends", ignoreCase = true) &&
+                        !extracted.equals("someone", ignoreCase = true) &&
+                        !extracted.equals("anyone", ignoreCase = true)) {
                         payee = extracted
                     }
                 }
